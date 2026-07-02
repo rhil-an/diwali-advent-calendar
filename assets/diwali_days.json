@@ -1,0 +1,233 @@
+{
+  "_meta": {
+    "note": "Countdown: ID 1 unlocks first (15 days before Diwali), ID 15 unlocks last (Bhai Dooj). IDs 11-15 are the 5 official Diwali days — marked special:true with jewel-tone tint.",
+    "payloadTypes": "text | assets/image.png | mp4:assets/video.mp4"
+  },
+  "ALL_DOORS": true,
+  "diwaliDate": "2026-10-29",
+  "credits": {
+    "enabled": true,
+    "text": "",
+    "color": "#FFD700",
+    "fontSize": 18,
+    "x": 0.3,
+    "y": 0.975
+  },
+  "diyas": [
+    {
+      "id": 1,
+      "x": 0.1,
+      "y": 0.35,
+      "w": 0.11,
+      "h": 0.16,
+      "theme": "Rangoli",
+      "emoji": "🎨",
+      "description": "Rangoli are beautiful geometric patterns drawn at home entrances using coloured powders, flower petals, and rice. They welcome Lakshmi, the goddess of prosperity, into the home.",
+      "payload": "text",
+      "cardImage": "images/rangoli-doorstep.png"
+    },
+    {
+      "id": 2,
+      "x": 0.27,
+      "y": 0.35,
+      "w": 0.11,
+      "h": 0.16,
+      "theme": "Cleaning the Home",
+      "emoji": "🏠",
+      "description": "Two weeks before Diwali, families deep-clean every corner of the home. A spotless house invites Goddess Lakshmi — she is said to visit only homes that are pure and welcoming.",
+      "payload": "text",
+      "cardImage": "images/cleaning-home-diwali.png"
+    },
+    {
+      "id": 3,
+      "x": 0.44,
+      "y": 0.35,
+      "w": 0.11,
+      "h": 0.16,
+      "theme": "Gold & Silver",
+      "emoji": "✨",
+      "description": "On Dhanteras, people purchase gold, silver, or new utensils as a symbol of prosperity. Buying metal on this day is believed to bring Lakshmi's blessings for the year ahead.",
+      "payload": "text",
+      "cardImage": "images/gold-silver-dhanteras.png"
+    },
+    {
+      "id": 4,
+      "x": 0.61,
+      "y": 0.35,
+      "w": 0.11,
+      "h": 0.16,
+      "theme": "Festival Sweets",
+      "emoji": "🍬",
+      "description": "Mithai — traditional Indian sweets — are central to Diwali. Kaju Katli (cashew fudge), Gulab Jamun, Ladoo, and Barfi are gifted between families to share in the joy of the festival.",
+      "payload": "text",
+      "cardImage": "images/festival-sweets-mithai.png"
+    },
+    {
+      "id": 5,
+      "x": 0.78,
+      "y": 0.35,
+      "w": 0.11,
+      "h": 0.16,
+      "theme": "Traditional Dress",
+      "emoji": "👗",
+      "description": "Diwali is a time to wear new clothes. Women wear vibrant sarees and lehengas in jewel tones — deep reds, royal blues, and golds — while men don kurta-pajamas or sherwanis.",
+      "payload": "text",
+      "cardImage": "images/traditional-dress-diwali.png"
+    },
+    {
+      "id": 6,
+      "x": 0.1,
+      "y": 0.54,
+      "w": 0.11,
+      "h": 0.16,
+      "theme": "The Diya",
+      "emoji": "🪔",
+      "description": "A diya is a small clay oil lamp. Ghee or sesame oil fuels the cotton wick. Rows of diyas on windowsills and doorsteps symbolise the victory of light over darkness, and knowledge over ignorance.",
+      "payload": "text",
+      "cardImage": "images/diya-rows-night.png"
+    },
+    {
+      "id": 7,
+      "x": 0.27,
+      "y": 0.54,
+      "w": 0.11,
+      "h": 0.16,
+      "theme": "Fireworks",
+      "emoji": "🎆",
+      "description": "Firecrackers have been part of Diwali for centuries — their lights and sounds are believed to ward off evil spirits. Today, many celebrate with sparklers and low-smoke alternatives.",
+      "payload": "text",
+      "cardImage": "images/diwali-fireworks-sky.png"
+    },
+    {
+      "id": 8,
+      "x": 0.44,
+      "y": 0.54,
+      "w": 0.11,
+      "h": 0.16,
+      "theme": "Marigold Garlands",
+      "emoji": "🌼",
+      "description": "Marigolds — called Genda Phool — are the flower of Diwali. Their vibrant orange and yellow hues symbolise auspiciousness and the sun. Garlands adorn doorways, idols, and offering plates.",
+      "payload": "text",
+      "cardImage": "images/marigold-garland-doorway.png"
+    },
+    {
+      "id": 9,
+      "x": 0.61,
+      "y": 0.54,
+      "w": 0.11,
+      "h": 0.16,
+      "theme": "Music & Dance",
+      "emoji": "🥁",
+      "description": "The dhol drum and tabla drive the rhythms of Diwali celebrations. Classical Bharatanatyam and folk Garba and Dandiya dances fill community gatherings with energy and colour.",
+      "payload": "text",
+      "cardImage": "images/music-and-dance.png"
+    },
+    {
+      "id": 10,
+      "x": 0.78,
+      "y": 0.54,
+      "w": 0.11,
+      "h": 0.16,
+      "theme": "Diwali Around the World",
+      "emoji": "🌍",
+      "description": "Diwali is celebrated by over a billion people globally — in India, UK, USA, Canada, Singapore, Fiji, South Africa, and beyond. It is a public holiday in over a dozen countries.",
+      "payload": "text",
+      "cardImage": "images/diwali-around-the-world.png"
+    },
+    {
+      "id": 11,
+      "x": 0.1,
+      "y": 0.73,
+      "w": 0.11,
+      "h": 0.16,
+      "special": true,
+      "tint": [
+        95,
+        45,
+        155
+      ],
+      "theme": "Dhanteras",
+      "emoji": "💛",
+      "description": "Day 1 of Diwali. Dhan means 'wealth'. Lakshmi and Kubera, god of wealth, are worshipped. Homes are lit with diyas at dusk, and new possessions are blessed for the year ahead.",
+      "payload": "text",
+      "cardImage": "images/dhanteras-day1-puja.png",
+      "unlockDay": 11
+    },
+    {
+      "id": 12,
+      "x": 0.27,
+      "y": 0.73,
+      "w": 0.11,
+      "h": 0.16,
+      "special": true,
+      "tint": [
+        155,
+        30,
+        45
+      ],
+      "theme": "Choti Diwali",
+      "emoji": "🌙",
+      "description": "Day 2 — 'Small Diwali'. Celebrates Lord Krishna's victory over the demon Narakasura. Families bathe before sunrise with scented oils, light extra diyas, and burst firecrackers.",
+      "payload": "text",
+      "cardImage": "images/choti-diwali-day2.png",
+      "unlockDay": 12
+    },
+    {
+      "id": 13,
+      "x": 0.44,
+      "y": 0.73,
+      "w": 0.11,
+      "h": 0.16,
+      "special": true,
+      "tint": [
+        170,
+        120,
+        10
+      ],
+      "theme": "Diwali — Main Day!",
+      "emoji": "🎇",
+      "description": "Day 3 — the heart of the festival! Lakshmi Puja is performed at night. Every home blazes with diyas and fairy lights. Fireworks light the sky. Families gather to pray, feast, and celebrate.",
+      "payload": "text",
+      "cardImage": "images/diwali-main-day3.png",
+      "unlockDay": 13
+    },
+    {
+      "id": 14,
+      "x": 0.61,
+      "y": 0.73,
+      "w": 0.11,
+      "h": 0.16,
+      "special": true,
+      "tint": [
+        30,
+        95,
+        55
+      ],
+      "theme": "Govardhan Puja",
+      "emoji": "🙏",
+      "description": "Day 4 — Lord Krishna lifted Govardhan hill to shelter villagers from Indra's storms. Annakut — a mountain of food — is offered to deities as gratitude for nature's abundance.",
+      "payload": "text",
+      "cardImage": "images/govardhan-puja-day4.png",
+      "unlockDay": 14
+    },
+    {
+      "id": 15,
+      "x": 0.78,
+      "y": 0.73,
+      "w": 0.11,
+      "h": 0.16,
+      "special": true,
+      "tint": [
+        20,
+        60,
+        148
+      ],
+      "theme": "Bhai Dooj",
+      "emoji": "💫",
+      "description": "Day 5 — the final day. Sisters pray for their brothers' long life, and brothers give gifts in return. It celebrates the eternal bond between siblings, mirroring the love of Yama and Yamuna.",
+      "payload": "text",
+      "cardImage": "images/bhai-dooj-day5.png",
+      "unlockDay": 15
+    }
+  ]
+}
