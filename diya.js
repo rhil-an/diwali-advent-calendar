@@ -36,7 +36,7 @@ class Diya {
     this.h           = cfg.h;
 
     this.payload     = cfg.payload || null;
-    this.unlockDay   = cfg.unlockDay || this.id;
+    this.ring        = cfg.ring || 1;   // 1 = outer (10), 2 = middle (4), 3 = center (1)
     this.theme       = cfg.theme       || "";
     this.description = cfg.description || "";
     this.emoji       = cfg.emoji       || "🪔";
@@ -110,7 +110,7 @@ class Diya {
 
   /* ── Pixel helpers ── */
   px() { return this.x * width; }
-  py() { return this.y * height; }
+  py() { return (this.y + WHEEL_OFFSET_Y) * height; }
   pw() { return this.w * width; }
   ph() { return this.h * height; }
 
@@ -546,7 +546,9 @@ class Diya {
 
   /* ── Predicates ── */
   isLit()          { return this.state === "lit" || this.state === "lighting"; }
-  canOpen(day)     { return day >= this.unlockDay; }
+  /* ── ringUnlocked is a boolean computed by the caller (sketch.js) from
+     whether every diya in the previous ring is fully lit ── */
+  canOpen(ringUnlocked) { return Boolean(ringUnlocked); }
   handleVideoFinished() { /* diya stays lit after video closes */ }
   isVideoPayload() { return typeof this.payload === "string" && this.payload.startsWith("mp4:"); }
   isTextPayload()  { return this.payload === "text"; }

@@ -16,7 +16,19 @@ let openSound;
 let lockedSound;
 let diyaConfig  = null;
 let creditsConfig = null;
-let diyaAccessConfig = { allDoors: false };
+
+// Title scroll banner — dynamic canvas object, editable via config or setText()
+let scrollBanner = null;
+let scrollBannerImg = null; // banner artwork, separate image asset from the scene background
+
+// Mandala — 3 concentric layers that bloom into view as each ring of
+// diyas is completed (ring 1 = outer/10, ring 2 = middle/4, ring 3 = center/1)
+let mandalaImages = {};
+const MANDALA_RING_COUNT = 3;
+let ringDiyas   = { 1: [], 2: [], 3: [] };
+let ringAlpha   = { 1: 0, 2: 0, 3: 0 };   // smoothed 0-1 display alpha per ring
+let ringBurst   = { 1: 0, 2: 0, 3: 0 };   // frames remaining in "just completed" glow pulse
+let ringWasDone = { 1: false, 2: false, 3: false };
 
 // Video overlay
 let videoElement        = null;
@@ -35,6 +47,11 @@ function preload() {
   const cb = Date.now();
   diyaConfig = loadJSON("assets/diwali_days.json?v=" + cb);
   bg = loadImage("images/advent-background.jpg?v=" + cb);
+  scrollBannerImg = loadImage(`assets/banner/title-banner.png?v=${cb}`);
+
+  mandalaImages.outer  = loadImage(`assets/mandala/mandala-outer.png?v=${cb}`);
+  mandalaImages.middle = loadImage(`assets/mandala/mandala-middle.png?v=${cb}`);
+  mandalaImages.center = loadImage(`assets/mandala/mandala-center.png?v=${cb}`);
 
   // Pre-load any image payloads
   const imgPayloads = collectImagePayloads(diyaConfig);
@@ -82,6 +99,11 @@ function draw() {
 
   clear();
   image(bg, 0, 0, width, height);
+
+  if (scrollBanner) scrollBanner.draw();
+
+  updateMandalaReveal();
+  drawMandalaLayers();
 
   drawSceneBrightness();
   drawCredits();
@@ -137,6 +159,91 @@ function drawSceneBrightness() {
 }
 
 /* -----------------------------------------------------------
+   Mandala reveal — 3 concentric layers bloom into color as each
+   ring of diyas (outer 10 / middle 4 / center 1) is completed
+----------------------------------------------------------- */
+
+const MANDALA_CX = 0.5;
+const MANDALA_CY = 0.60;
+// Nudges the whole diya wheel + mandala bloom down together (fraction of canvas height),
+// without disturbing their relative alignment. Tune this single value to reposition both.
+const WHEEL_OFFSET_Y = 0.0736;
+// Extra per-ring vertical nudge (fraction of canvas height) for the mandala image layers
+// only — lets an individual ring (e.g. the middle layer) be fine-tuned without moving the
+// diyas or the other mandala layers.
+const MANDALA_RING_EXTRA_OFFSET_Y = { 1: 0, 2: -0.01, 3: -0.01 };
+// Radii as a fraction of the background's native width (1536px design),
+// so they scale correctly at any canvas/viewport size.
+const MANDALA_R  = { 1: 280 / 1536, 2: 105 / 1536, 3: 40 / 1536 };
+// Blows up each mandala layer beyond the radius the diyas sit on, so the diyas nest
+// into/overlap the petals instead of floating just outside the flower's edge.
+const MANDALA_SCALE = 1.25;
+const MANDALA_IMG_KEY = { 1: "outer", 2: "middle", 3: "center" };
+const RING_EASE      = 0.06;   // per-frame lerp speed toward target alpha
+const RING_BURST_LEN = 45;     // frames the "just completed" glow pulse lasts
+
+function ringLitFraction(ringNumber) {
+  const members = ringDiyas[ringNumber];
+  if (!members || members.length === 0) return 0;
+  const lit = members.filter((d) => d.isLit()).length;
+  return lit / members.length;
+}
+
+function isRingUnlocked(ringNumber) {
+  if (ringNumber <= 1) return true;
+  return ringLitFraction(ringNumber - 1) >= 1;
+}
+
+function updateMandalaReveal() {
+  for (let r = 1; r <= MANDALA_RING_COUNT; r++) {
+    const target = ringLitFraction(r);
+    ringAlpha[r] += (target - ringAlpha[r]) * RING_EASE;
+
+    const justCompleted = target >= 1 && !ringWasDone[r];
+    if (justCompleted) {
+      ringBurst[r] = RING_BURST_LEN;
+      ringWasDone[r] = true;
+    } else if (target < 1) {
+      ringWasDone[r] = false;
+    }
+
+    if (ringBurst[r] > 0) ringBurst[r]--;
+  }
+}
+
+function drawMandalaLayers() {
+  if (!mandalaImages.outer) return;
+
+  push();
+  imageMode(CENTER);
+  const ctx = drawingContext;
+  ctx.save();
+  ctx.globalCompositeOperation = "screen"; // black pixels contribute nothing — no fringing
+
+  for (let r = 1; r <= MANDALA_RING_COUNT; r++) {
+    const alpha = ringAlpha[r];
+    if (alpha <= 0.002) continue;
+
+    const img = mandalaImages[MANDALA_IMG_KEY[r]];
+    if (!img) continue;
+
+    const burstT   = ringBurst[r] / RING_BURST_LEN;           // 1 → 0 over the pulse
+    const pulse    = 1 + Math.sin(burstT * Math.PI) * 0.12;   // brief scale-up bump
+    const glowMult = 1 + burstT * 0.6;                        // brief brightness bump
+
+    const size = 2 * MANDALA_R[r] * width * pulse * MANDALA_SCALE;
+    const cx   = MANDALA_CX * width;
+    const cy   = (MANDALA_CY + WHEEL_OFFSET_Y + MANDALA_RING_EXTRA_OFFSET_Y[r]) * height;
+
+    ctx.globalAlpha = Math.min(1, alpha * glowMult);
+    image(img, cx, cy, size, size);
+  }
+
+  ctx.restore();
+  pop();
+}
+
+/* -----------------------------------------------------------
    Credits text
 ----------------------------------------------------------- */
 
@@ -162,11 +269,9 @@ function mousePressed() {
   // interacted with — prevents opening a second card on top of the first.
   if (isOverlayOpen()) return;
 
-  const currentDay = resolveCurrentDay();
-
   for (let d of diyas) {
     if (!d.isHit(mouseX, mouseY)) continue;
-    handleDiyaInteraction(d, currentDay);
+    handleDiyaInteraction(d);
     break; // one diya at a time
   }
 }
@@ -178,9 +283,9 @@ function isOverlayOpen() {
 }
 
 /* ── Diya-click logic shared here for readability. ── */
-function handleDiyaInteraction(d, currentDay) {
+function handleDiyaInteraction(d) {
   if (d.state === "unlit") {
-    if (!d.canOpen(currentDay)) {
+    if (!d.canOpen(isRingUnlocked(d.ring))) {
       d.triggerLocked();
       return;
     }
@@ -375,17 +480,6 @@ function teardownVideoOverlay() {
 }
 
 /* -----------------------------------------------------------
-   Unlock / day resolution
------------------------------------------------------------ */
-
-function resolveCurrentDay() {
-  if (diyaAccessConfig.allDoors) return 99; // unlock all
-  // In production: compute days remaining until Diwali
-  // For now, fall back to calendar day
-  return new Date().getDate();
-}
-
-/* -----------------------------------------------------------
    Config hydration
 ----------------------------------------------------------- */
 
@@ -395,10 +489,20 @@ function hydrateDiyas(data) {
     return;
   }
 
-  diyaAccessConfig.allDoors = Boolean(data.ALL_DOORS);
   creditsConfig = data.credits || null;
 
+  // Standalone, editable title scroll (see scroll.js) — banner artwork is its own
+  // image asset (assets/banner/title-banner.png), separate from the background.
+  scrollBanner = new ScrollBanner(data.scrollBanner || {}, scrollBannerImg);
+  window.scrollBanner = scrollBanner; // handy for live edits from the browser console
+
   diyas = data.diyas.map((cfg) => new Diya(cfg, diyaImages, openSound, lockedSound, flameFrames));
+
+  ringDiyas = { 1: [], 2: [], 3: [] };
+  for (const d of diyas) {
+    if (!ringDiyas[d.ring]) ringDiyas[d.ring] = [];
+    ringDiyas[d.ring].push(d);
+  }
 }
 
 function collectImagePayloads(config) {
