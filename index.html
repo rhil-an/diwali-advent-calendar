@@ -2,10 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
-  />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Diwali Advent Calendar</title>
 
   <!-- Google Fonts -->
@@ -23,32 +20,9 @@
 <body>
   <div id="canvas-container"></div>
 
-  <!-- Shown only on narrow portrait phones (see style.css); dismissible -->
-  <div id="rotate-hint" aria-live="polite">
-    <div class="rotate-hint-inner">
-      <div class="rotate-hint-icon" aria-hidden="true">📱</div>
-      <p class="rotate-hint-text">For the best experience,<br />rotate your device to landscape.</p>
-      <button type="button" class="rotate-hint-dismiss">Continue anyway</button>
-    </div>
-  </div>
-
   <!-- Diya and ScrollBanner classes must load before sketch -->
   <script src="diya.js"></script>
   <script src="scroll.js"></script>
   <script src="sketch.js"></script>
-
-  <script>
-    // Dismiss the portrait rotate hint; re-arms automatically on next rotation to portrait.
-    (function () {
-      var hint = document.getElementById("rotate-hint");
-      if (!hint) return;
-      hint.querySelector(".rotate-hint-dismiss").addEventListener("click", function () {
-        hint.classList.add("is-dismissed");
-      });
-      window.addEventListener("orientationchange", function () {
-        hint.classList.remove("is-dismissed");
-      });
-    })();
-  </script>
 </body>
 </html>

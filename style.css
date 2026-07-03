@@ -27,9 +27,7 @@ body {
 /* ─── Canvas container ─── */
 #canvas-container {
   position: relative;
-  width: 100vw;
-  height: 100dvh;
-  overflow: hidden;    /* clips the canvas when mobile cover-scaling makes it larger than the viewport */
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -37,12 +35,11 @@ body {
 
 canvas {
   display: block;
-  /* Display size is set by sketch.js resizeToViewport() so the whole scene
-     (background, scroll banner, diyas) scales uniformly — like object-fit: contain.
-     Do not force 100vw here; that stretches the canvas independently of its aspect ratio. */
+  width: 100vw !important;
   max-width: 100vw;
-  max-height: 100dvh;
-  touch-action: none;          /* prevent pinch-zoom / double-tap zoom on the scene */
+  height: auto !important;
+  max-height: 100vh;
+  object-fit: contain;
 }
 
 /* ─────────────────────────────────────────
@@ -346,66 +343,3 @@ canvas {
   }
 }
 
-/* ─────────────────────────────────────────
-   Rotate-to-landscape hint (narrow portrait phones only)
-───────────────────────────────────────── */
-#rotate-hint {
-  display: none;                       /* revealed via the media query below */
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  align-items: center;
-  justify-content: center;
-  padding: calc(24px + env(safe-area-inset-top))
-           calc(24px + env(safe-area-inset-right))
-           calc(24px + env(safe-area-inset-bottom))
-           calc(24px + env(safe-area-inset-left));
-  text-align: center;
-  background: radial-gradient(ellipse at center, #16163a 0%, #0D0D2B 75%);
-  color: #f0d07a;
-  font-family: 'Poppins', sans-serif;
-}
-
-.rotate-hint-inner {
-  max-width: 320px;
-}
-
-.rotate-hint-icon {
-  font-size: 56px;
-  margin-bottom: 18px;
-  animation: rotateHintSpin 2.4s ease-in-out infinite;
-}
-
-@keyframes rotateHintSpin {
-  0%, 60%, 100% { transform: rotate(0deg); }
-  80%           { transform: rotate(90deg); }
-}
-
-.rotate-hint-text {
-  font-size: 16px;
-  line-height: 1.6;
-  margin-bottom: 22px;
-  color: #f5e2b8;
-}
-
-.rotate-hint-dismiss {
-  min-height: 44px;
-  padding: 10px 22px;
-  border-radius: 999px;
-  border: 1.5px solid #b8780a;
-  background: rgba(184, 120, 10, 0.18);
-  color: #FFD700;
-  font-family: 'Cinzel', serif;
-  font-size: 13px;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  cursor: pointer;
-}
-.rotate-hint-dismiss:hover { background: rgba(184, 120, 10, 0.36); }
-
-/* Show only on small phones held in portrait; hidden once dismissed or rotated. */
-@media (orientation: portrait) and (pointer: coarse) and (max-width: 600px) {
-  #rotate-hint:not(.is-dismissed) {
-    display: flex;
-  }
-}

@@ -31,12 +31,9 @@ class Diya {
   constructor(cfg, images, openSound, lockedSound, flameFrames) {
     this.id          = cfg.id;
 
-    // Per-layout normalized positions: { landscape:{x,y,w,h}, portrait:{x,y,w,h} }.
-    // Falls back to legacy top-level x/y/w/h for backwards compatibility.
-    this.positions   = cfg.pos || null;
-    const initial    = this.positions
-      ? (this.positions[typeof activeLayoutName !== "undefined" ? activeLayoutName : "landscape"] || this.positions.landscape)
-      : cfg;
+    // Normalized position — flat { x, y, w, h } object (all values 0–1 fractions).
+    // Falls back to top-level x/y/w/h on the config for backwards compatibility.
+    const initial    = cfg.pos || cfg;
     this.x           = initial.x;      // normalized 0–1
     this.y           = initial.y;
     this.w           = initial.w;
@@ -115,22 +112,9 @@ class Diya {
     if (this.flameHoldFrames <= 0) this.advanceFlameFrame();
   }
 
-  /* ── Re-point this diya at the given layout's coordinates. State (lit/unlit,
-     flame animation, etc.) is untouched, so switching layouts never resets the
-     scene — only the position/size changes. ── */
-  setPosition(layoutName) {
-    if (!this.positions) return;
-    const p = this.positions[layoutName] || this.positions.landscape;
-    if (!p) return;
-    this.x = p.x;
-    this.y = p.y;
-    this.w = p.w;
-    this.h = p.h;
-  }
-
   /* ── Pixel helpers ── */
   px() { return this.x * width; }
-  py() { return (this.y + WHEEL_OFFSET_Y) * height; }
+  py() { return this.y * height; }
   pw() { return this.w * width; }
   ph() { return this.h * height; }
 
