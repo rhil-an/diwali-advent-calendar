@@ -12,9 +12,9 @@
     "y": 0.975
   },
   "scrollBanner": {
-    "_note": "The 'Diwali Advent Calendar' title banner — draws assets/banner/title-banner.png (a standalone image asset, separate from the scene background) and layers 'text' on top of it (see scroll.js). Edit 'text' here to change what it says, or call scrollBanner.setText('...') from the browser console for live edits. Text auto-shrinks/wraps to stay inside 'safeArea' (fractions of the banner image itself) so it can never overflow the ribbon artwork, however long or short it is.",
+    "_note": "The 'Countdown to Diwali' title banner — draws assets/banner/title-banner.png (a standalone image asset, separate from the scene background) and layers 'text' on top of it (see scroll.js). Edit 'text' here to change what it says, or call scrollBanner.setText('...') from the browser console for live edits. Text auto-shrinks/wraps to stay inside 'safeArea' (fractions of the banner image itself) so it can never overflow the ribbon artwork, however long or short it is.",
     "enabled": true,
-    "text": "Diwali Advent Calendar",
+    "text": "Countdown to Diwali",
     "textColor": "#7a1204",
     "textShadow": "#ffe6b8",
     "x": 0.5,

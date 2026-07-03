@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------
-   Scroll Banner — the "Diwali Advent Calendar" title ribbon
+   Scroll Banner — the "Countdown to Diwali" title ribbon
    Draws the standalone banner artwork (assets/banner/title-banner.png,
    generated separately from the scene background) and layers the title
    text on top of it. The text is auto-fit — shrunk and wrapped as needed —
@@ -13,7 +13,7 @@ const SCROLL_DESIGN_WIDTH = 1536; // reference width the numeric px fields were 
 class ScrollBanner {
   constructor(cfg = {}, bannerImg = null) {
     this.enabled    = cfg.enabled !== false;
-    this.text       = cfg.text        || "Diwali Advent Calendar";
+    this.text       = cfg.text        || "Countdown to Diwali";
     this.textColor  = cfg.textColor   || "#7a1204";
     this.textShadow = cfg.textShadow  || "#ffe6b8";
     this.image      = bannerImg;
