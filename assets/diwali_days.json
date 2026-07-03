@@ -28,7 +28,7 @@
     },
 
     "portrait": {
-      "background": "images/advent-background-portrait.jpg",
+      "background": "images/advent-background-portrait.png",
       "aspect": 0.9941,
       "wheelOffsetY": 0,
       "mandala": {

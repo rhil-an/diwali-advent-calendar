@@ -61,7 +61,7 @@ function preload() {
   diyaConfig = loadJSON("assets/diwali_days.json?v=" + cb);
   // Both background variants are preloaded so switching orientation is instant.
   bgLandscape = loadImage("images/advent-background.jpg?v=" + cb);
-  bgPortrait  = loadImage("images/advent-background-portrait.jpg?v=" + cb);
+  bgPortrait  = loadImage("images/advent-background-portrait.png?v=" + cb);
   bg = bgLandscape;
   scrollBannerImg = loadImage(`assets/banner/title-banner.png?v=${cb}`);
 
