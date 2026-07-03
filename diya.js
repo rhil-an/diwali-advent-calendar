@@ -460,7 +460,9 @@ class Diya {
   drawAmbientGlow(cx, cy, w) {
     push();
     noStroke();
-    for (let r = w * 1.8; r > w * 0.25; r -= w * 0.30) {
+    // Fewer, wider steps on mobile to halve the ellipse draw-call count per lit diya
+    const glowStep = (typeof isMobile !== "undefined" && isMobile) ? w * 0.52 : w * 0.30;
+    for (let r = w * 1.8; r > w * 0.25; r -= glowStep) {
       fill(255, 168, 42, map(r, w * 0.25, w * 1.8, 32, 0));
       ellipse(cx, cy - w * 0.18, r * 2, r * 1.3);
     }

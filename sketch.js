@@ -46,6 +46,16 @@ let embers     = [];
 let canvasEl   = null;
 let canvasScale = 1;
 
+// Mobile detection — drives performance budgets and cover-fill scaling
+const isMobile = (() => {
+  try { return navigator.maxTouchPoints > 0 || /Mobi/i.test(navigator.userAgent); }
+  catch (_) { return false; }
+})();
+
+// Offscreen background cache — pre-scales source JPEG once; blitted 1:1 every frame
+let bgCache      = null;
+let bgCacheDirty = true;
+
 function preload() {
   const cb = Date.now();
   diyaConfig = loadJSON("assets/diwali_days.json?v=" + cb);
@@ -85,7 +95,8 @@ function setup() {
   let c = createCanvas(10, 10);   // real size is set by applyLayout()/resizeToViewport()
   canvasEl = c;
   c.parent("canvas-container");
-  pixelDensity(Math.min(window.devicePixelRatio || 1, 2));
+  pixelDensity(isMobile ? 1 : Math.min(window.devicePixelRatio || 1, 2));
+  frameRate(isMobile ? 30 : 60);
 
   if (diyaConfig) {
     ensureImagesLoaded(diyaConfig);
@@ -125,6 +136,7 @@ function applyLayout(name) {
   const L = diyaConfig.layouts[name];
 
   bg = name === "portrait" ? bgPortrait : bgLandscape;
+  bgCacheDirty = true;
 
   const m = L.mandala || {};
   MANDALA_CX    = m.cx ?? 0.5;
@@ -160,7 +172,9 @@ function draw() {
   if (!bg) return;
 
   clear();
-  image(bg, 0, 0, width, height);
+  if (!bgCache || bgCacheDirty) buildBgCache();
+  if (bgCache) image(bgCache, 0, 0);
+  else         image(bg, 0, 0, width, height);
 
   if (scrollBanner) scrollBanner.draw();
 
@@ -187,16 +201,29 @@ window.addEventListener("orientationchange", () => setTimeout(handleViewportChan
 
 function resizeToViewport() {
   if (!bg) return;
-  const scale = Math.min(windowWidth / bg.width, windowHeight / bg.height);
+  // Mobile uses cover scaling (fills viewport edge-to-edge, clipping the image edges).
+  // Desktop uses contain scaling (letterboxes to preserve the full scene).
+  const scale = isMobile
+    ? Math.max(windowWidth / bg.width, windowHeight / bg.height)
+    : Math.min(windowWidth / bg.width, windowHeight / bg.height);
   canvasScale = scale;
   const newW = Math.max(1, Math.round(bg.width  * scale));
   const newH = Math.max(1, Math.round(bg.height * scale));
   resizeCanvas(newW, newH);
+  bgCacheDirty = true;
   if (canvasEl && canvasEl.elt) {
     canvasEl.elt.style.width  = `${newW}px`;
     canvasEl.elt.style.height = `${newH}px`;
   }
   rebuildEmbers();
+}
+
+function buildBgCache() {
+  if (!bg) return;
+  if (bgCache) bgCache.remove();
+  bgCache = createGraphics(width, height);
+  bgCache.image(bg, 0, 0, width, height);
+  bgCacheDirty = false;
 }
 
 /* -----------------------------------------------------------
@@ -660,7 +687,9 @@ function drawEmbers() {
 
 function rebuildEmbers() {
   embers = [];
-  const count = Math.max(60, Math.round(120 * (canvasScale || 1)));
+  const count = isMobile
+    ? Math.max(15, Math.round(30 * (canvasScale || 1)))
+    : Math.max(60, Math.round(120 * (canvasScale || 1)));
   for (let i = 0; i < count; i++) {
     embers.push({
       x:         random(width),

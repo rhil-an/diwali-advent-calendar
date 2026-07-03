@@ -27,7 +27,9 @@ body {
 /* ─── Canvas container ─── */
 #canvas-container {
   position: relative;
-  width: 100%;
+  width: 100vw;
+  height: 100dvh;
+  overflow: hidden;    /* clips the canvas when mobile cover-scaling makes it larger than the viewport */
   display: flex;
   align-items: center;
   justify-content: center;

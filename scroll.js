@@ -36,12 +36,17 @@ class ScrollBanner {
     this.minFontSizePx = cfg.minFontSize ?? 14;  // never shrink smaller than this
     this.lineHeight    = cfg.lineHeight  ?? 1.08;
     this.maxLines      = cfg.maxLines    ?? 2;
+
+    // Memoized text-fit result — recomputed only when banner size or text changes
+    this._textCache    = null;
+    this._textCacheKey = null;
   }
 
   /* ── Public API for dynamically changing the banner's text at runtime,
      e.g. from the browser console: scrollBanner.setText("Happy Diwali!") ── */
   setText(newText) {
     this.text = String(newText ?? "");
+    this._textCache = null;
   }
 
   setColors({ textColor, textShadow } = {}) {
@@ -61,6 +66,7 @@ class ScrollBanner {
     if (b.lineHeight != null) this.lineHeight   = b.lineHeight;
     if (b.maxLines != null)   this.maxLines     = b.maxLines;
     if (b.safeArea)           this.safeArea     = b.safeArea;
+    this._textCache = null;  // font size / safe-area may have changed
   }
 
   /* ── p5 fill()/stroke() don't reliably parse 8-digit #rrggbbaa hex across
@@ -92,8 +98,8 @@ class ScrollBanner {
      user types into the config, the loop below keeps backing off the font
      size and re-wrapping until it fits, down to a sane minimum. ── */
   drawFittedText(cx, cy, bannerW, bannerH) {
-    const boxW = (this.safeArea.x1 - this.safeArea.x0) * bannerW;
-    const boxH = (this.safeArea.y1 - this.safeArea.y0) * bannerH;
+    const boxW  = (this.safeArea.x1 - this.safeArea.x0) * bannerW;
+    const boxH  = (this.safeArea.y1 - this.safeArea.y0) * bannerH;
     const boxCx = cx + (((this.safeArea.x0 + this.safeArea.x1) / 2) - 0.5) * bannerW;
     const boxCy = cy + (((this.safeArea.y0 + this.safeArea.y1) / 2) - 0.5) * bannerH;
 
@@ -102,23 +108,33 @@ class ScrollBanner {
     textStyle(BOLD);
     textAlign(CENTER, CENTER);
 
-    let fontPx = (this.fontSizePx / SCROLL_DESIGN_WIDTH) * width;
-    const minFontPx = Math.max(4, (this.minFontSizePx / SCROLL_DESIGN_WIDTH) * width);
+    // Cache key encodes every input that affects the fit result.
+    // Rounded to integers so sub-pixel jitter never busts the cache.
+    const cacheKey = `${Math.round(bannerW)}|${Math.round(bannerH)}|${this.text}|${this.fontSizePx}|${this.minFontSizePx}`;
+    let lines, fontPx;
 
-    let lines = [this.text];
-    for (;;) {
-      textSize(fontPx);
-      lines = ScrollBanner.wrapToWidth(this.text, boxW, this.maxLines);
-      const lineH = fontPx * this.lineHeight;
-      const totalH = lineH * lines.length;
-      const maxLineW = Math.max(...lines.map((l) => textWidth(l)));
-
-      const fits = totalH <= boxH && maxLineW <= boxW;
-      if (fits || fontPx <= minFontPx) break;
-      fontPx = Math.max(minFontPx, fontPx * 0.94);
+    if (this._textCache && this._textCacheKey === cacheKey) {
+      ({ lines, fontPx } = this._textCache);
+    } else {
+      fontPx = (this.fontSizePx / SCROLL_DESIGN_WIDTH) * width;
+      const minFontPx = Math.max(4, (this.minFontSizePx / SCROLL_DESIGN_WIDTH) * width);
+      lines = [this.text];
+      for (;;) {
+        textSize(fontPx);
+        lines = ScrollBanner.wrapToWidth(this.text, boxW, this.maxLines);
+        const lineH    = fontPx * this.lineHeight;
+        const totalH   = lineH * lines.length;
+        const maxLineW = Math.max(...lines.map((l) => textWidth(l)));
+        const fits     = totalH <= boxH && maxLineW <= boxW;
+        if (fits || fontPx <= minFontPx) break;
+        fontPx = Math.max(minFontPx, fontPx * 0.94);
+      }
+      this._textCache    = { lines, fontPx };
+      this._textCacheKey = cacheKey;
     }
 
-    const lineH = fontPx * this.lineHeight;
+    textSize(fontPx);
+    const lineH  = fontPx * this.lineHeight;
     const startY = boxCy - (lineH * (lines.length - 1)) / 2;
 
     for (let i = 0; i < lines.length; i++) {
