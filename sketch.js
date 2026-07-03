@@ -8,7 +8,10 @@
    - Video popup (same approach as advent-calendar)
 ----------------------------------------------------------- */
 
-let bg;
+let bg;                 // the active layout's background (points at one of the two below)
+let bgLandscape;
+let bgPortrait;
+let activeLayoutName = "landscape";
 let diyas       = [];
 let diyaImages  = {};
 let flameFrames = [];
@@ -46,7 +49,10 @@ let canvasScale = 1;
 function preload() {
   const cb = Date.now();
   diyaConfig = loadJSON("assets/diwali_days.json?v=" + cb);
-  bg = loadImage("images/advent-background.jpg?v=" + cb);
+  // Both background variants are preloaded so switching orientation is instant.
+  bgLandscape = loadImage("images/advent-background.jpg?v=" + cb);
+  bgPortrait  = loadImage("images/advent-background-portrait.jpg?v=" + cb);
+  bg = bgLandscape;
   scrollBannerImg = loadImage(`assets/banner/title-banner.png?v=${cb}`);
 
   mandalaImages.outer  = loadImage(`assets/mandala/mandala-outer.png?v=${cb}`);
@@ -74,24 +80,80 @@ function preload() {
 }
 
 function setup() {
-  let c = createCanvas(bg.width, bg.height);
+  activeLayoutName = chooseLayoutName();
+
+  let c = createCanvas(10, 10);   // real size is set by applyLayout()/resizeToViewport()
   canvasEl = c;
   c.parent("canvas-container");
   pixelDensity(Math.min(window.devicePixelRatio || 1, 2));
-  resizeToViewport();
 
   if (diyaConfig) {
     ensureImagesLoaded(diyaConfig);
     hydrateDiyas(diyaConfig);
+    applyLayout(activeLayoutName);
   } else {
     loadJSON("assets/diwali_days.json?v=" + Date.now(), (data) => {
       diyaConfig = data;
       ensureImagesLoaded(data);
       hydrateDiyas(data);
+      applyLayout(activeLayoutName);
+      resizeToViewport();
     });
   }
 
+  resizeToViewport();
   initEmbers();
+}
+
+/* -----------------------------------------------------------
+   Responsive layout selection (landscape vs portrait)
+----------------------------------------------------------- */
+
+// Portrait layout kicks in when the viewport is taller than it is wide
+// (aspect ratio below the configured breakpoint, default 1.0).
+function chooseLayoutName() {
+  const bp = (diyaConfig && diyaConfig.layoutBreakpoint) || 1.0;
+  return (windowWidth / windowHeight) < bp ? "portrait" : "landscape";
+}
+
+// Swaps the whole scene to a layout variant: background image, mandala
+// geometry, banner placement, credits, and every diya's position — all by id,
+// so lit/unlit state is preserved across the switch.
+function applyLayout(name) {
+  if (!diyaConfig || !diyaConfig.layouts || !diyaConfig.layouts[name]) return;
+  activeLayoutName = name;
+  const L = diyaConfig.layouts[name];
+
+  bg = name === "portrait" ? bgPortrait : bgLandscape;
+
+  const m = L.mandala || {};
+  MANDALA_CX    = m.cx ?? 0.5;
+  MANDALA_CY    = m.cy ?? 0.60;
+  MANDALA_SCALE = m.scale ?? 1.25;
+  WHEEL_OFFSET_Y = L.wheelOffsetY ?? 0;
+  if (m.radii) {
+    MANDALA_R = { 1: +m.radii["1"], 2: +m.radii["2"], 3: +m.radii["3"] };
+  }
+  MANDALA_RING_EXTRA_OFFSET_Y = m.ringExtraOffsetY
+    ? { 1: +m.ringExtraOffsetY["1"] || 0, 2: +m.ringExtraOffsetY["2"] || 0, 3: +m.ringExtraOffsetY["3"] || 0 }
+    : { 1: 0, 2: 0, 3: 0 };
+
+  for (const d of diyas) d.setPosition(name);
+
+  if (scrollBanner) scrollBanner.applyLayout(L.banner || {});
+
+  if (creditsConfig && L.credits) {
+    creditsConfig.x        = L.credits.x ?? creditsConfig.x;
+    creditsConfig.y        = L.credits.y ?? creditsConfig.y;
+    creditsConfig.fontSize = L.credits.fontSize ?? creditsConfig.fontSize;
+  }
+}
+
+// Re-evaluate which layout the current viewport wants, switch if needed, then re-fit.
+function handleViewportChange() {
+  const want = chooseLayoutName();
+  if (want !== activeLayoutName) applyLayout(want);
+  resizeToViewport();
 }
 
 function draw() {
@@ -116,8 +178,12 @@ function draw() {
 }
 
 function windowResized() {
-  resizeToViewport();
+  handleViewportChange();
 }
+
+// iOS/Safari report stale window dimensions immediately after a rotation,
+// so re-evaluate the layout + re-fit again shortly after it settles.
+window.addEventListener("orientationchange", () => setTimeout(handleViewportChange, 200));
 
 function resizeToViewport() {
   if (!bg) return;
@@ -127,8 +193,8 @@ function resizeToViewport() {
   const newH = Math.max(1, Math.round(bg.height * scale));
   resizeCanvas(newW, newH);
   if (canvasEl && canvasEl.elt) {
-    canvasEl.elt.style.setProperty("width",  `${newW}px`, "important");
-    canvasEl.elt.style.setProperty("height", `${newH}px`);
+    canvasEl.elt.style.width  = `${newW}px`;
+    canvasEl.elt.style.height = `${newH}px`;
   }
   rebuildEmbers();
 }
@@ -163,21 +229,20 @@ function drawSceneBrightness() {
    ring of diyas (outer 10 / middle 4 / center 1) is completed
 ----------------------------------------------------------- */
 
-const MANDALA_CX = 0.5;
-const MANDALA_CY = 0.60;
+// These are set per active layout by applyLayout() (see layouts in diwali_days.json).
+// Defaults mirror the landscape layout so the scene renders even before a layout applies.
+let MANDALA_CX = 0.5;
+let MANDALA_CY = 0.60;
 // Nudges the whole diya wheel + mandala bloom down together (fraction of canvas height),
-// without disturbing their relative alignment. Tune this single value to reposition both.
-const WHEEL_OFFSET_Y = 0.0736;
-// Extra per-ring vertical nudge (fraction of canvas height) for the mandala image layers
-// only — lets an individual ring (e.g. the middle layer) be fine-tuned without moving the
-// diyas or the other mandala layers.
-const MANDALA_RING_EXTRA_OFFSET_Y = { 1: 0, 2: -0.01, 3: -0.01 };
-// Radii as a fraction of the background's native width (1536px design),
-// so they scale correctly at any canvas/viewport size.
-const MANDALA_R  = { 1: 280 / 1536, 2: 105 / 1536, 3: 40 / 1536 };
+// without disturbing their relative alignment.
+let WHEEL_OFFSET_Y = 0.0736;
+// Extra per-ring vertical nudge (fraction of canvas height) for the mandala image layers only.
+let MANDALA_RING_EXTRA_OFFSET_Y = { 1: 0, 2: -0.01, 3: -0.01 };
+// Radii as a fraction of the canvas width, so they scale at any viewport size.
+let MANDALA_R  = { 1: 280 / 1536, 2: 105 / 1536, 3: 40 / 1536 };
 // Blows up each mandala layer beyond the radius the diyas sit on, so the diyas nest
 // into/overlap the petals instead of floating just outside the flower's edge.
-const MANDALA_SCALE = 1.25;
+let MANDALA_SCALE = 1.25;
 const MANDALA_IMG_KEY = { 1: "outer", 2: "middle", 3: "center" };
 const RING_EASE      = 0.06;   // per-frame lerp speed toward target alpha
 const RING_BURST_LEN = 45;     // frames the "just completed" glow pulse lasts
@@ -264,16 +329,48 @@ function drawCredits() {
    Mouse interaction
 ----------------------------------------------------------- */
 
-function mousePressed() {
+// Guards against p5 1.x firing mousePressed twice per tap on mobile
+// Chrome/Android (touch + synthesized mouse event). Reset on release.
+let _tapReleased = true;
+
+/* ── True when the tap landed on a DOM element (reveal card, close button,
+   dim overlay, rotate hint) rather than the p5 canvas. In those cases we must
+   NOT return false: p5 turns a false return into event.preventDefault(), which
+   on touch devices cancels the synthesized click and stops DOM buttons (like
+   the card's × close button) from working. Only canvas taps should be
+   suppressed to block scroll/zoom gestures. ── */
+function _tapIsOnCanvas(event) {
+  if (!event || !event.target) return true;        // no event info → assume canvas
+  return Boolean(canvasEl && event.target === canvasEl.elt);
+}
+
+function mouseReleased(event) {
+  _tapReleased = true;
+  return _tapIsOnCanvas(event) ? false : true;
+}
+
+function mousePressed(event) {
+  // Taps on DOM overlays/buttons must pass through untouched so their own
+  // click handlers fire (especially on touch devices).
+  if (!_tapIsOnCanvas(event)) {
+    _tapReleased = true;
+    return true;
+  }
+
+  if (!_tapReleased) return false;
+  _tapReleased = false;
+
   // Require the current card/video to be closed before another diya can be
   // interacted with — prevents opening a second card on top of the first.
-  if (isOverlayOpen()) return;
+  if (isOverlayOpen()) return false;
 
   for (let d of diyas) {
     if (!d.isHit(mouseX, mouseY)) continue;
     handleDiyaInteraction(d);
     break; // one diya at a time
   }
+
+  return false;
 }
 
 /* ── True while a reveal card or video overlay is on screen. Used to block

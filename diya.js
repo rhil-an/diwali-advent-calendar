@@ -30,10 +30,17 @@ function randomHoldFrames() {
 class Diya {
   constructor(cfg, images, openSound, lockedSound, flameFrames) {
     this.id          = cfg.id;
-    this.x           = cfg.x;          // normalized 0–1
-    this.y           = cfg.y;
-    this.w           = cfg.w;
-    this.h           = cfg.h;
+
+    // Per-layout normalized positions: { landscape:{x,y,w,h}, portrait:{x,y,w,h} }.
+    // Falls back to legacy top-level x/y/w/h for backwards compatibility.
+    this.positions   = cfg.pos || null;
+    const initial    = this.positions
+      ? (this.positions[typeof activeLayoutName !== "undefined" ? activeLayoutName : "landscape"] || this.positions.landscape)
+      : cfg;
+    this.x           = initial.x;      // normalized 0–1
+    this.y           = initial.y;
+    this.w           = initial.w;
+    this.h           = initial.h;
 
     this.payload     = cfg.payload || null;
     this.ring        = cfg.ring || 1;   // 1 = outer (10), 2 = middle (4), 3 = center (1)
@@ -106,6 +113,19 @@ class Diya {
 
     this.flameHoldFrames--;
     if (this.flameHoldFrames <= 0) this.advanceFlameFrame();
+  }
+
+  /* ── Re-point this diya at the given layout's coordinates. State (lit/unlit,
+     flame animation, etc.) is untouched, so switching layouts never resets the
+     scene — only the position/size changes. ── */
+  setPosition(layoutName) {
+    if (!this.positions) return;
+    const p = this.positions[layoutName] || this.positions.landscape;
+    if (!p) return;
+    this.x = p.x;
+    this.y = p.y;
+    this.w = p.w;
+    this.h = p.h;
   }
 
   /* ── Pixel helpers ── */

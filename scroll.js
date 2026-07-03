@@ -49,6 +49,20 @@ class ScrollBanner {
     if (textShadow) this.textShadow = textShadow;
   }
 
+  /* ── Apply an active-layout banner block (position/size/fit), leaving the
+     text and colours untouched. Called on load and whenever the responsive
+     layout switches between landscape and portrait. ── */
+  applyLayout(b = {}) {
+    if (b.x != null)          this.x            = b.x;
+    if (b.y != null)          this.y            = b.y;
+    if (b.w != null)          this.w            = b.w;
+    if (b.fontSize != null)   this.fontSizePx   = b.fontSize;
+    if (b.minFontSize != null) this.minFontSizePx = b.minFontSize;
+    if (b.lineHeight != null) this.lineHeight   = b.lineHeight;
+    if (b.maxLines != null)   this.maxLines     = b.maxLines;
+    if (b.safeArea)           this.safeArea     = b.safeArea;
+  }
+
   /* ── p5 fill()/stroke() don't reliably parse 8-digit #rrggbbaa hex across
      browsers, so alpha-blended tones are built through p5's color() instead ── */
   static withAlpha(hexColor, alpha) {

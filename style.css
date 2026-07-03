@@ -5,9 +5,18 @@
   padding: 0;
 }
 
+/* ─── Root — prevent browser gesture interference ─── */
+html, body {
+  overscroll-behavior: none;   /* kills pull-to-refresh / rubber-band scroll */
+}
+
 /* ─── Body — deep indigo night ─── */
 body {
-  background: #0D0D2B;
+  /* Subtle radial glow so the letterbox bands read as intentional design,
+     not empty space, when the 3:2 scene is centered on off-ratio screens. */
+  background:
+    radial-gradient(ellipse at center, #16163a 0%, #0D0D2B 70%);
+  background-color: #0D0D2B;
   min-height: 100vh;
   display: flex;
   align-items: center;
@@ -26,11 +35,12 @@ body {
 
 canvas {
   display: block;
-  width: 100vw !important;
+  /* Display size is set by sketch.js resizeToViewport() so the whole scene
+     (background, scroll banner, diyas) scales uniformly — like object-fit: contain.
+     Do not force 100vw here; that stretches the canvas independently of its aspect ratio. */
   max-width: 100vw;
-  height: auto !important;
-  max-height: 100vh;
-  object-fit: contain;
+  max-height: 100dvh;
+  touch-action: none;          /* prevent pinch-zoom / double-tap zoom on the scene */
 }
 
 /* ─────────────────────────────────────────
@@ -51,6 +61,9 @@ canvas {
   top: 50%;
   z-index: 20;
   width: min(400px, 90vw);
+  max-height: min(86vh, 640px);
+  display: flex;
+  flex-direction: column;
   background:
     linear-gradient(160deg, #1c0900 0%, #3a1500 60%, #1c0900 100%);
   border: 1.5px solid #b8780a;
@@ -85,7 +98,7 @@ canvas {
 /* ── Hero-style image card (inspired by thenosamchronicles.com book cards):
      full-bleed photo, dark bottom scrim, content anchored over the scrim ── */
 .reveal-card.has-image {
-  min-height: 420px;
+  min-height: clamp(300px, 60vh, 420px);
   max-height: 86vh;
   overflow: hidden;                 /* clips the Ken Burns zoom on the photo layer */
   background-color: #1c0900;        /* fallback tone while loading / if the photo 404s */
@@ -131,6 +144,9 @@ canvas {
   position: relative;
   z-index: 2;
   padding: 30px 30px 32px;
+  overflow-y: auto;                    /* long content scrolls within the card */
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;                 /* allow vertical scroll inside the card */
 }
 
 /* Extra gradient sized to the content box itself (not the whole card) so
@@ -199,7 +215,7 @@ canvas {
 
 .card-title {
   font-family: 'Cinzel', serif;
-  font-size: 25px;
+  font-size: clamp(20px, 5vw, 25px);
   font-weight: 700;
   color: #FFD700;
   text-shadow: 0 0 22px rgba(255, 215, 0, 0.45);
@@ -220,7 +236,7 @@ canvas {
 }
 
 .card-body {
-  font-size: 14.5px;
+  font-size: clamp(13px, 3.6vw, 14.5px);
   line-height: 1.75;
   color: #f0d07a;
   font-weight: 300;
@@ -244,7 +260,12 @@ canvas {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 6px;
+  /* Keep the video + its outset close button clear of notches / rounded corners */
+  padding:
+    max(6px, env(safe-area-inset-top))
+    max(6px, env(safe-area-inset-right))
+    max(6px, env(safe-area-inset-bottom))
+    max(6px, env(safe-area-inset-left));
 }
 
 .video-overlay {
@@ -299,4 +320,90 @@ canvas {
   color: #fff;
   font-size: 14px;
   border-radius: 12px;
+}
+
+/* ─────────────────────────────────────────
+   Touch devices — larger, always-visible tap targets
+───────────────────────────────────────── */
+@media (pointer: coarse) {
+  .reveal-card-close {
+    width: 44px;
+    height: 44px;
+    font-size: 24px;
+  }
+
+  /* No hover on touch, so keep the video close button visible + tappable */
+  .video-close-btn {
+    width: 44px;
+    height: 44px;
+    font-size: 24px;
+    top: 4px;
+    right: 4px;
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+/* ─────────────────────────────────────────
+   Rotate-to-landscape hint (narrow portrait phones only)
+───────────────────────────────────────── */
+#rotate-hint {
+  display: none;                       /* revealed via the media query below */
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  align-items: center;
+  justify-content: center;
+  padding: calc(24px + env(safe-area-inset-top))
+           calc(24px + env(safe-area-inset-right))
+           calc(24px + env(safe-area-inset-bottom))
+           calc(24px + env(safe-area-inset-left));
+  text-align: center;
+  background: radial-gradient(ellipse at center, #16163a 0%, #0D0D2B 75%);
+  color: #f0d07a;
+  font-family: 'Poppins', sans-serif;
+}
+
+.rotate-hint-inner {
+  max-width: 320px;
+}
+
+.rotate-hint-icon {
+  font-size: 56px;
+  margin-bottom: 18px;
+  animation: rotateHintSpin 2.4s ease-in-out infinite;
+}
+
+@keyframes rotateHintSpin {
+  0%, 60%, 100% { transform: rotate(0deg); }
+  80%           { transform: rotate(90deg); }
+}
+
+.rotate-hint-text {
+  font-size: 16px;
+  line-height: 1.6;
+  margin-bottom: 22px;
+  color: #f5e2b8;
+}
+
+.rotate-hint-dismiss {
+  min-height: 44px;
+  padding: 10px 22px;
+  border-radius: 999px;
+  border: 1.5px solid #b8780a;
+  background: rgba(184, 120, 10, 0.18);
+  color: #FFD700;
+  font-family: 'Cinzel', serif;
+  font-size: 13px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.rotate-hint-dismiss:hover { background: rgba(184, 120, 10, 0.36); }
+
+/* Show only on small phones held in portrait; hidden once dismissed or rotated. */
+@media (orientation: portrait) and (pointer: coarse) and (max-width: 600px) {
+  #rotate-hint:not(.is-dismissed) {
+    display: flex;
+  }
 }
