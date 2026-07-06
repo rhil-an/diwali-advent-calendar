@@ -4,7 +4,7 @@
    Payloads: "text" | "assets/image.png" | "mp4:assets/vid.mp4"
 ----------------------------------------------------------- */
 
-const FLAME_ANIM_STEP    = 1 / 45;   // ~45 frames for flame to grow
+const FLAME_ANIM_STEP    = 1 / 75;   // ~75 frames (~1.25 s) for flame to grow
 const CONTENT_DELAY_MS   = 9000;     // image content visible duration
 const CONTENT_FADE_MS    = 1800;     // image content fade duration
 const DIYA_SHAKE_FRAMES  = 20;
@@ -56,6 +56,7 @@ class Diya {
     // State machine
     this.state             = "unlit";   // "unlit" | "lighting" | "lit"
     this.animProgress      = 0;         // 0→1  flame grow
+    this.onLit             = null;      // optional callback fired once lighting→lit
 
     // Image content bounce
     this.contentProgress      = 0;
@@ -187,6 +188,9 @@ class Diya {
 
         // Kick off image bounce reveal
         if (this.isImagePayload()) this.startContentReveal();
+
+        // Notify any pending card/video opener
+        if (this.onLit) { const cb = this.onLit; this.onLit = null; cb(); }
       }
     }
 

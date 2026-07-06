@@ -34,6 +34,7 @@ let ringWasDone = { 1: false, 2: false, 3: false };
 let MANDALA_CX = 0.5;
 let MANDALA_CY = 0.70;
 let MANDALA_R  = { 1: 0.24, 2: 0.10, 3: 0.05 };
+let MANDALA_RING_EXTRA_OFFSET_X = { 1: 0, 2: 0, 3: 0 };
 let MANDALA_RING_EXTRA_OFFSET_Y = { 1: 0, 2: 0, 3: 0 };
 
 const MANDALA_IMG_KEY = { 1: "outer", 2: "middle", 3: "center" };
@@ -187,6 +188,7 @@ function updateMandalaReveal() {
   for (let r = 1; r <= MANDALA_RING_COUNT; r++) {
     const target = ringLitFraction(r);
     ringAlpha[r] += (target - ringAlpha[r]) * RING_EASE;
+    if (target >= 1) ringAlpha[r] = 1;
 
     const justCompleted = target >= 1 && !ringWasDone[r];
     if (justCompleted) {
@@ -221,7 +223,7 @@ function drawMandalaLayers() {
     const glowMult = 1 + burstT * 0.6;
 
     const size = 2 * MANDALA_R[r] * width * pulse;
-    const cx   = MANDALA_CX * width;
+    const cx   = (MANDALA_CX + MANDALA_RING_EXTRA_OFFSET_X[r]) * width;
     const cy   = (MANDALA_CY + MANDALA_RING_EXTRA_OFFSET_Y[r]) * height;
 
     ctx.globalAlpha = Math.min(1, alpha * glowMult);
@@ -297,9 +299,12 @@ function handleDiyaInteraction(d) {
     }
     const result = d.light();
     if (result?.type === "video") {
-      playVideo(result.src, d);
+      // Delay video popup until flame animation finishes
+      const src = result.src;
+      d.onLit = () => playVideo(src, d);
     } else if (result?.type === "text") {
-      showRevealCard(d);
+      // Delay card until flame animation finishes
+      d.onLit = () => showRevealCard(d);
     }
     return;
   }
@@ -493,6 +498,9 @@ function hydrateDiyas(data) {
   if (m.radii) {
     MANDALA_R = { 1: +m.radii["1"], 2: +m.radii["2"], 3: +m.radii["3"] };
   }
+  MANDALA_RING_EXTRA_OFFSET_X = m.ringExtraOffsetX
+    ? { 1: +m.ringExtraOffsetX["1"] || 0, 2: +m.ringExtraOffsetX["2"] || 0, 3: +m.ringExtraOffsetX["3"] || 0 }
+    : { 1: 0, 2: 0, 3: 0 };
   MANDALA_RING_EXTRA_OFFSET_Y = m.ringExtraOffsetY
     ? { 1: +m.ringExtraOffsetY["1"] || 0, 2: +m.ringExtraOffsetY["2"] || 0, 3: +m.ringExtraOffsetY["3"] || 0 }
     : { 1: 0, 2: 0, 3: 0 };
