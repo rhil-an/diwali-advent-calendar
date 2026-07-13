@@ -520,6 +520,33 @@ function teardownSpringPopup() {
    Custom video player — singleton DOM structure, reused per playback
 ----------------------------------------------------------- */
 
+/* ── Compute and apply exact pixel dimensions — mirrors advent-calendar ──
+   Called on loadedmetadata, loadeddata, canplay, and window resize.
+   The wrapper is inline-flex so it automatically hugs the video size.   */
+function applyVideoFit() {
+  if (!videoPlayerEl) return;
+  // ~55 px is the height of the custom controls bar below the video
+  const CONTROLS_H = 55;
+  const maxW = window.innerWidth  * 0.95;
+  const maxH = window.innerHeight * 0.95 - CONTROLS_H;
+  const vw = videoPlayerEl.videoWidth  || maxW;
+  const vh = videoPlayerEl.videoHeight || maxH;
+  if (vw <= 0 || vh <= 0) {
+    videoPlayerEl.style.width  = `${maxW}px`;
+    videoPlayerEl.style.height = `${maxH}px`;
+    return;
+  }
+  const ratio = vw / vh;
+  let targetW = Math.min(maxW, maxH * ratio);
+  let targetH = targetW / ratio;
+  if (targetH > maxH) {
+    targetH = maxH;
+    targetW = targetH * ratio;
+  }
+  videoPlayerEl.style.width  = `${Math.round(targetW)}px`;
+  videoPlayerEl.style.height = `${Math.round(targetH)}px`;
+}
+
 /* ── Format seconds as M:SS (e.g. 75 → "1:15") ── */
 function fmtVideoTime(secs) {
   if (!isFinite(secs) || isNaN(secs) || secs < 0) return "0:00";
@@ -668,11 +695,17 @@ function initVideoPlayer() {
   videoPlayerEl.addEventListener("loadeddata", () => {
     const l = videoPlayerContainer && videoPlayerContainer.querySelector(".video-loading");
     if (l) l.style.display = "none";
+    applyVideoFit();
   });
   videoPlayerEl.addEventListener("canplay", () => {
     const l = videoPlayerContainer && videoPlayerContainer.querySelector(".video-loading");
     if (l) l.style.display = "none";
+    applyVideoFit();
   });
+  // Fires as soon as we know the video's natural width/height
+  videoPlayerEl.addEventListener("loadedmetadata", applyVideoFit);
+  // Re-fit whenever the browser window is resized (e.g. phone orientation flip)
+  window.addEventListener("resize", applyVideoFit);
 
   // Seek bar + time counter — driven by timeupdate
   videoPlayerEl.addEventListener("timeupdate", () => {
@@ -708,11 +741,18 @@ function initVideoPlayer() {
     if (isVideoInFullscreen()) {
       videoFullscreenBtn.textContent = "⊡";
       videoFullscreenBtn.setAttribute("aria-label", "Exit fullscreen");
+      // Clear JS-set pixel dimensions so the CSS :fullscreen rules take over
+      if (videoPlayerEl) {
+        videoPlayerEl.style.width  = "";
+        videoPlayerEl.style.height = "";
+      }
     } else {
       videoFullscreenBtn.textContent = "⛶";
       videoFullscreenBtn.setAttribute("aria-label", "Enter fullscreen");
       // Unlock orientation whenever we leave fullscreen
       try { screen.orientation.unlock(); } catch (_) {}
+      // Restore correct pixel dimensions for windowed mode
+      applyVideoFit();
     }
   };
   document.addEventListener("fullscreenchange",       onFsChange);
@@ -866,6 +906,9 @@ function playVideo(src) {
   videoPlayerEl.load();
   videoPlayerContainer.style.display = "";
   videoOverlayWrapper = videoPlayerContainer;
+
+  // Fire an immediate fit in case metadata is already cached from a prior play
+  applyVideoFit();
 
   // Start idle countdown as soon as the player is visible
   resetIdleTimer();

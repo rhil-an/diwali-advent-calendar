@@ -256,18 +256,23 @@ canvas {
    Custom video player
 ───────────────────────────────────────── */
 
-/* ── Container — fullscreen target ── */
+/* ── Container — fullscreen target ──
+   Mirrors advent-calendar's approach: wrapper is inline-flex so it
+   hugs the video's computed size (set by applyVideoFit() in JS).
+   This is the key that makes portrait/landscape work on mobile. ── */
 .video-overlay-wrapper {
   position: absolute;
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
   z-index: 9999;
-  display: flex;
+  display: inline-flex;
   flex-direction: column;
   align-items: stretch;
-  width: 95%;
-  max-width: 100%;
+  /* No forced width — JS applyVideoFit() drives the video pixel size
+     and the wrapper hugs it via inline-flex.  max-width is a CSS
+     fallback before the first JS measurement fires. */
+  max-width: 95vw;
   background: #000;
   border-radius: 14px;
   overflow: hidden;
@@ -292,12 +297,17 @@ canvas {
   background: #000;
 }
 
-/* ── <video> element — scales proportionally, never clips ── */
+/* ── <video> element — scales proportionally, never clips ──
+   width/height are set in exact pixels by applyVideoFit() in JS.
+   max-width/max-height here are CSS fallbacks only (before first JS
+   measurement), matching the advent-calendar approach. ── */
 .video-overlay {
   display: block;
-  width: 100%;
+  width: auto;
   height: auto;
-  max-width: 100%;
+  max-width: 95vw;
+  /* Reserve ~55 px for the custom controls bar below the video */
+  max-height: calc(95vh - 55px);
   object-fit: contain;
   background: #000;
 }
@@ -305,10 +315,11 @@ canvas {
 .video-overlay-wrapper:fullscreen .video-overlay,
 .video-overlay-wrapper:-webkit-full-screen .video-overlay,
 .video-overlay-wrapper:-moz-full-screen .video-overlay {
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
-  height: auto;
+  /* JS clears the inline width/height on fullscreen enter so these take over */
+  width: auto !important;
+  height: auto !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
   object-fit: contain;
   flex-shrink: 0;
 }
