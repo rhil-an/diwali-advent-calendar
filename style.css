@@ -33,6 +33,13 @@ body {
   justify-content: center;
 }
 
+/* Global state lock (CSS fallback) — while a lamp's fire animation is
+   playing, disable all pointer interaction on the canvas so rapid/overlapping
+   clicks can't reach it. Toggled from sketch.js via setAnimationLock(). */
+#canvas-container.animation-locked {
+  pointer-events: none;
+}
+
 canvas {
   display: block;
   width: 100vw !important;
@@ -40,6 +47,43 @@ canvas {
   height: auto !important;
   max-height: 100vh;
   object-fit: contain;
+}
+
+/* ─────────────────────────────────────────
+   Two-circle moon phase (light disc + sliding sky shadow)
+───────────────────────────────────────── */
+
+.moon-container {
+  position: absolute;
+  z-index: 4;
+  pointer-events: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  overflow: hidden;
+  /* Soft rim light so the disc reads against the night sky */
+  box-shadow:
+    0 0 0 1px rgba(255, 230, 170, 0.18),
+    0 0 18px rgba(255, 214, 120, 0.28);
+}
+
+.moon-light {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 32%, #fff6d2 0%, #f0d78a 42%, #d4b45a 100%);
+}
+
+.moon-shadow {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  /* Match the night-sky tone sampled from the scene (~#100F2F / body #0D0D2B) */
+  background-color: #100f2f;
+  transform: translateX(100%);
+  transition: transform 0.85s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
 }
 
 /* ─────────────────────────────────────────
@@ -704,5 +748,48 @@ canvas {
 
 .spring-popup.spring-popup-out {
   animation: springPopOut 0.4s ease-in forwards;
+}
+
+/* ─────────────────────────────────────────
+   Flame "flare up" micro-interaction
+   Played when a user re-clicks a lamp that is already unlocked/lit,
+   right before its popup/card re-opens (see showFlameFlare() in sketch.js).
+   The flame itself is canvas-rendered, so this is a positioned DOM glow
+   overlay synced to the lamp's wick tip — same technique as .spring-popup.
+───────────────────────────────────────── */
+.flame-flare {
+  position: fixed;
+  pointer-events: none;       /* never blocks lamp clicks */
+  z-index: 90;                /* above canvas, below spring-popup (100) + cards */
+  transform: translate(-50%, -50%) scale(1);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 235, 170, 0.95) 0%,
+    rgba(255, 170, 40, 0.65)  40%,
+    rgba(255, 110, 0, 0)      75%
+  );
+}
+
+@keyframes flame-burst {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    filter: brightness(1);
+    opacity: 0.85;
+  }
+  40% {
+    transform: translate(-50%, -50%) scale(1.5);
+    filter: brightness(1.9);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    filter: brightness(1);
+    opacity: 0.85;
+  }
+}
+
+.flame-flare.is-flaring {
+  animation: flame-burst 800ms ease-out forwards;
 }
 

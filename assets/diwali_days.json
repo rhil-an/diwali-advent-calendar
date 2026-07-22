@@ -1,6 +1,6 @@
 {
   "_meta": {
-    "note": "Mandala layout: ring 1 = 10 outer diyas (always unlocked). ring 2 = 4 middle diyas, unlocked once all of ring 1 are lit. ring 3 = the 1 center diya, unlocked once all of ring 2 are lit. IDs 11-15 are the 5 official Diwali days — marked special:true with jewel-tone tint.",
+    "note": "Sequential unlock: diyas open in day order (1→15) via currentUnlockedDay in sketch.js. Layout rings are independent of unlock order: outer=1–10, middle=11/12/14/15, center=13 (main Diwali). Mandala rings bloom as each ring's diyas are lit. IDs 11-15 are the 5 official Diwali days — marked special:true with jewel-tone tint.",
     "payloadTypes": "text | assets/image.png | mp4:assets/video.mp4",
     "background": "images/diwali-background.png (664x997)"
   },
@@ -261,7 +261,7 @@
     },
     {
       "id": 13,
-      "ring": 2,
+      "ring": 3,
       "special": true,
       "tint": [
         170,
@@ -302,7 +302,7 @@
     },
     {
       "id": 15,
-      "ring": 3,
+      "ring": 2,
       "special": true,
       "tint": [
         20,

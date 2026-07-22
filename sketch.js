@@ -17,6 +17,13 @@ let lockedSound;
 let diyaConfig  = null;
 let creditsConfig = null;
 
+// Global state lock — prevents overlapping lamp interactions.
+// Set the instant a lamp starts its ignite (fire) animation, released the
+// instant that animation completes (see Diya.onLit in handleDiyaInteraction).
+// While true, ALL lamp clicks are ignored so a fast second click can never
+// interrupt/overlap the first lamp's flame-growth + popup flow.
+let isAnimating = false;
+
 // Title scroll banner
 let scrollBanner    = null;
 let scrollBannerImg = null;
@@ -102,10 +109,44 @@ const SPRING_POPUP_DAYS = {
 let springPopupEl    = null;
 let springPopupTimer = null;
 
+// Flame "flare up" — micro-interaction played on re-click of an already
+// unlocked lamp, before its popup/card re-opens. See showFlameFlare().
+let flameFlareEl = null;
+const FLAME_FLARE_MS = 800; // must match the flame-burst keyframe duration in style.css
+
 // Embers
 let embers     = [];
 let canvasEl   = null;
 let canvasScale = 1;
+
+/* -----------------------------------------------------------
+   Sequential unlock + CSS two-circle moon phase
+   Lamps must be opened in day order (1 → 15). The moon shadow
+   slides via translateX using the lunar illumination table below.
+----------------------------------------------------------- */
+
+let currentUnlockedDay = 1;
+let moonContainerEl    = null;
+let moonShadowEl       = null;
+
+// Illumination % per calendar day (from lunar-cycle CSV mapping)
+const MOON_ILLUMINATION = {
+  1:  100,
+  2:  85,
+  3:  76,
+  4:  67,
+  5:  57,
+  6:  46, // Third Quarter
+  7:  36,
+  8:  26,
+  9:  17,
+  10: 10,
+  11: 5,
+  12: 1,
+  13: 0,  // New Moon
+  14: 1,  // Waxing Crescent
+  15: 5,
+};
 
 function preload() {
   const cb = Date.now();
@@ -157,6 +198,7 @@ function setup() {
   resizeToViewport();
   initEmbers();
   initVideoPlayer();
+  initMoonPhase();
 }
 
 function draw() {
@@ -176,7 +218,8 @@ function draw() {
 
   for (let d of diyas) {
     d.update();
-    d.draw();
+    const sequentiallyLocked = d.state === "unlit" && d.id > currentUnlockedDay;
+    d.draw({ locked: sequentiallyLocked });
   }
 }
 
@@ -196,6 +239,54 @@ function resizeToViewport() {
     canvasEl.elt.style.setProperty("height", `${newH}px`);
   }
   rebuildEmbers();
+  syncMoonPosition();
+}
+
+/* -----------------------------------------------------------
+   Moon phase — CSS two-circle overlap
+   Illumination 100% → shadow fully off (translateX 100%)
+   Illumination   0% → shadow fully covers (translateX 0%)
+   Days 1–13 wane (shadow exits to the right);
+   days 14–15 wax (shadow exits to the left) for the opposite crescent.
+----------------------------------------------------------- */
+
+function initMoonPhase() {
+  moonContainerEl = document.getElementById("moon-container");
+  moonShadowEl    = document.getElementById("moon-shadow");
+  updateMoonPhase(currentUnlockedDay);
+  syncMoonPosition();
+}
+
+function updateMoonPhase(day) {
+  if (!moonShadowEl) moonShadowEl = document.getElementById("moon-shadow");
+  if (!moonShadowEl) return;
+
+  const clamped = Math.max(1, Math.min(15, day | 0));
+  const illum   = MOON_ILLUMINATION[clamped] ?? 0;
+
+  // Positive X = waning (lit on the left as shadow slides right).
+  // Negative X = waxing after new moon (crescent grows on the opposite side).
+  const tx = clamped >= 14 ? -illum : illum;
+  moonShadowEl.style.transform = `translateX(${tx}%)`;
+}
+
+function syncMoonPosition() {
+  if (!moonContainerEl) moonContainerEl = document.getElementById("moon-container");
+  if (!moonContainerEl || !canvasEl || !canvasEl.elt) return;
+
+  const canvas = canvasEl.elt;
+  const parent = canvas.parentElement;
+  if (!parent) return;
+
+  const cr = canvas.getBoundingClientRect();
+  const pr = parent.getBoundingClientRect();
+  const size = Math.max(28, Math.round(cr.width * 0.085));
+
+  // Upper sky, slightly left of centre — sits in the night band above the garland
+  moonContainerEl.style.width  = `${size}px`;
+  moonContainerEl.style.height = `${size}px`;
+  moonContainerEl.style.left   = `${cr.left - pr.left + cr.width * 0.22 - size / 2}px`;
+  moonContainerEl.style.top    = `${cr.top  - pr.top  + cr.height * 0.07 - size / 2}px`;
 }
 
 /* -----------------------------------------------------------
@@ -231,11 +322,6 @@ function ringLitFraction(ringNumber) {
   const members = ringDiyas[ringNumber];
   if (!members || members.length === 0) return 0;
   return members.filter((d) => d.isLit()).length / members.length;
-}
-
-function isRingUnlocked(ringNumber) {
-  if (ringNumber <= 1) return true;
-  return ringLitFraction(ringNumber - 1) >= 1;
 }
 
 function updateMandalaReveal() {
@@ -345,43 +431,90 @@ function isOverlayOpen() {
   return Boolean(revealCardEl || videoOverlayWrapper);
 }
 
+/* ── Global state lock helpers ──
+   setAnimationLock(true)  — engaged the instant a lamp starts igniting.
+   setAnimationLock(false) — released the instant that lamp's fire animation
+   reaches "lit" (see Diya.update()/onLit below), right before its popup opens.
+   Also toggles a CSS class on the canvas container as a pointer-events
+   fallback, so stray/rapid clicks can't even reach the canvas mid-animation. */
+function setAnimationLock(active) {
+  isAnimating = active;
+  const container = document.getElementById("canvas-container");
+  if (container) container.classList.toggle("animation-locked", active);
+}
+
 function handleDiyaInteraction(d) {
+  // Guard clause: ignore every click while a lamp's fire animation is
+  // still playing, so a fast second click can never interrupt/overlap it.
+  if (isAnimating) return;
+
   const isSpringDay = Boolean(SPRING_POPUP_DAYS[d.id]);
 
   if (d.state === "unlit") {
-    if (!d.canOpen(isRingUnlocked(d.ring))) {
-      d.triggerLocked();
+    // Sequential unlock: only the current day (and any earlier unlit days) may open.
+    // Days ahead of currentUnlockedDay shake and stay locked.
+    if (d.id > currentUnlockedDay) {
+      d.triggerLocked(); // canvas shake + locked sound
       return;
     }
+
+    // Lock immediately — this diya is about to start its fire animation.
+    setAnimationLock(true);
+
     const result = d.light();
-    if (isSpringDay) {
-      // Spring days: show 3D popup only — no info card
-      showSpringPopup(d);
-    } else {
-      if (result?.type === "video") {
-        const src = result.src;
-        d.onLit = () => playVideo(src, d);
-      } else if (result?.type === "text") {
-        d.onLit = () => showRevealCard(d);
-      }
+
+    if (d.id === currentUnlockedDay) {
+      currentUnlockedDay = Math.min(currentUnlockedDay + 1, 16);
+      updateMoonPhase(Math.min(currentUnlockedDay, 15));
     }
+
+    // Fires exactly once, the frame the flame finishes growing and the
+    // diya's state flips from "lighting" → "lit" (Diya.update()). This is
+    // the canvas equivalent of an `animationend` listener — release the
+    // lock first, then open whatever popup/video/card this lamp triggers.
+    d.onLit = () => {
+      setAnimationLock(false);
+      if (isSpringDay) {
+        // Spring days: show 3D popup only — no info card
+        showSpringPopup(d);
+      } else if (result?.type === "video") {
+        playVideo(result.src, d);
+      } else if (result?.type === "text") {
+        showRevealCard(d);
+      }
+    };
     return;
   }
 
+  // Re-click of an already-unlocked lamp (d.id <= currentUnlockedDay, i.e.
+  // it has already been lit). Delay the popup/card slightly and play a
+  // quick "flare up" flame animation first, so the re-click feels alive
+  // rather than opening the content instantly.
   if (d.state === "lit") {
-    if (isSpringDay) {
-      // Re-click: retrigger the popup, skip the info card
-      showSpringPopup(d);
-      return;
-    }
-    const result = d.reopen();
-    if (result?.type === "video") {
-      playVideo(result.src, d);
-    } else if (result?.type === "text") {
-      showRevealCard(d);
-    } else if (result?.type === "image") {
-      d.replayImageContent();
-    }
+    // isAnimating was already checked at the top of this function — engage
+    // the lock now so a spam-click can't interrupt the flare mid-flight.
+    setAnimationLock(true);
+    showFlameFlare(d);
+
+    setTimeout(() => {
+      teardownFlameFlare();
+      setAnimationLock(false);
+
+      if (isSpringDay) {
+        // Re-click: retrigger the popup, skip the info card
+        showSpringPopup(d);
+        return;
+      }
+      const result = d.reopen();
+      if (result?.type === "video") {
+        playVideo(result.src, d);
+      } else if (result?.type === "text") {
+        showRevealCard(d);
+      } else if (result?.type === "image") {
+        d.replayImageContent();
+      }
+    }, FLAME_FLARE_MS);
+
     return;
   }
 }
@@ -514,6 +647,50 @@ function dismissSpringPopup() {
 function teardownSpringPopup() {
   if (springPopupTimer) { clearTimeout(springPopupTimer); springPopupTimer = null; }
   if (springPopupEl)    { springPopupEl.remove(); springPopupEl = null; }
+}
+
+/* -----------------------------------------------------------
+   Flame "flare up" — re-click micro-interaction
+   The flame itself is canvas-rendered (see Diya.drawFlame), so this
+   creates a small DOM glow overlay positioned over the lamp's wick tip
+   (same viewport-sync technique as showSpringPopup) and toggles the
+   .is-flaring class to play the CSS flame-burst keyframe animation.
+----------------------------------------------------------- */
+
+function showFlameFlare(diya) {
+  teardownFlameFlare();
+
+  const canvasRect = canvasEl.elt.getBoundingClientRect();
+  const scaleX = canvasRect.width  / width;
+  const scaleY = canvasRect.height / height;
+
+  const wick      = diya.getWickTip();
+  const w         = diya.pw();
+  // Mirrors the flame geometry in Diya.drawLit()/drawFlame(): the flame
+  // sprite's visual center sits a bit above the wick tip.
+  const flameSize   = diya.special ? w * 0.46 : w * 0.30;
+  const centerX     = wick.x;
+  const centerY     = wick.y - flameSize * 1.05;
+  const diameter    = flameSize * 3.2;
+
+  flameFlareEl = document.createElement("div");
+  flameFlareEl.className = "flame-flare";
+  flameFlareEl.style.width  = `${diameter * scaleX}px`;
+  flameFlareEl.style.height = `${diameter * scaleY}px`;
+  flameFlareEl.style.left   = `${canvasRect.left + centerX * scaleX}px`;
+  flameFlareEl.style.top    = `${canvasRect.top  + centerY * scaleY}px`;
+
+  document.body.appendChild(flameFlareEl);
+
+  // Force a style recalculation so the animation always (re)starts cleanly.
+  void flameFlareEl.offsetWidth;
+  flameFlareEl.classList.add("is-flaring");
+}
+
+// Caller (handleDiyaInteraction) owns the FLAME_FLARE_MS setTimeout and
+// invokes this once the animation has finished playing.
+function teardownFlameFlare() {
+  if (flameFlareEl) { flameFlareEl.remove(); flameFlareEl = null; }
 }
 
 /* -----------------------------------------------------------
@@ -927,9 +1104,10 @@ function teardownVideoOverlay() {
    Radial / Petal lamp placement
    Reads the `radialLayout` block from the JSON config and overrides
    each Diya's x/y to sit on the mandala petals via polar coordinates.
-   Each lamp is first placed at its exact geometric centre on the petal,
-   then a small random "petal jitter" is added so they don't look rigid.
-   The lamp's w/h from `pos` are always preserved.
+   Layout layers are keyed by day ID (not unlock order): outer 1–10,
+   middle 11/12/14/15, center 13. Chronological unlock (currentUnlockedDay)
+   is unchanged. Outer/middle lamps get a small random "petal jitter";
+   the centre lamp does not. The lamp's w/h from `pos` are always preserved.
 
    Geometry notes
    ─────────────
@@ -950,13 +1128,19 @@ function computeRadialPositions(rl, diyasList) {
   const middleCfg = rl.middle || {};
   const jitterPx  = rl.jitterPx ?? 20;
 
-  const outerCount      = outerCfg.count          ?? 10;
   const outerRadius     = outerCfg.radius          ?? 0.32;
   const outerOffsetRad  = ((outerCfg.angleOffsetDeg  ?? -90) * Math.PI) / 180;
 
-  const middleCount     = middleCfg.count          ?? 4;
   const middleRadius    = middleCfg.radius         ?? 0.13;
   const middleOffsetRad = ((middleCfg.angleOffsetDeg ?? 45) * Math.PI) / 180;
+
+  // Layout grouping is independent of chronological unlock order (1→15).
+  // Day 13 (main Diwali) sits dead-centre; 14 & 15 remain on the middle ring.
+  const outerLamps  = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  const middleLamps = [11, 12, 14, 15];
+  const centerLamp  = 13;
+
+  const byId = Object.fromEntries(diyasList.map((d) => [d.id, d]));
 
   // The radius is expressed as a fraction of canvas WIDTH. To keep the ring
   // circular in pixel space on a non-square canvas, scale the y-component by
@@ -964,13 +1148,11 @@ function computeRadialPositions(rl, diyasList) {
   // in both axes.
   const aspect = width / height;
 
-  const outerDiyas  = diyasList.filter(d => d.ring === 1).sort((a, b) => a.id - b.id);
-  const middleDiyas = diyasList.filter(d => d.ring === 2).sort((a, b) => a.id - b.id);
-  const centerDiyas = diyasList.filter(d => d.ring === 3);
-
   // ── Outer ring (lamps 1–10) ──────────────────────────────────────────────
-  outerDiyas.forEach((d, i) => {
-    const angle = outerOffsetRad + (TWO_PI / outerCount) * i;
+  outerLamps.forEach((id, i) => {
+    const d = byId[id];
+    if (!d) return;
+    const angle = outerOffsetRad + (TWO_PI / outerLamps.length) * i;
     const jx    = (Math.random() * 2 - 1) * (jitterPx / width);
     const jy    = (Math.random() * 2 - 1) * (jitterPx / height);
     // Centre of the petal → then shift by -w/2, -h/2 to get the top-left corner
@@ -978,20 +1160,23 @@ function computeRadialPositions(rl, diyasList) {
     d.y = radCY + outerRadius * aspect * Math.sin(angle) - d.h / 2 + jy;
   });
 
-  // ── Middle ring (lamps 11–14) ────────────────────────────────────────────
-  middleDiyas.forEach((d, i) => {
-    const angle = middleOffsetRad + (TWO_PI / middleCount) * i;
+  // ── Middle ring (lamps 11, 12, 14, 15) ────────────────────────────────────
+  middleLamps.forEach((id, i) => {
+    const d = byId[id];
+    if (!d) return;
+    const angle = middleOffsetRad + (TWO_PI / middleLamps.length) * i;
     const jx    = (Math.random() * 2 - 1) * (jitterPx / width);
     const jy    = (Math.random() * 2 - 1) * (jitterPx / height);
     d.x = radCX + middleRadius          * Math.cos(angle) - d.w / 2 + jx;
     d.y = radCY + middleRadius * aspect * Math.sin(angle) - d.h / 2 + jy;
   });
 
-  // ── Centre lamp (lamp 15) — dead-centre, no jitter ──────────────────────
-  centerDiyas.forEach((d) => {
-    d.x = radCX - d.w / 2;
-    d.y = radCY - d.h / 2;
-  });
+  // ── Centre lamp (lamp 13 — main Diwali) — dead-centre, no jitter ─────────
+  const center = byId[centerLamp];
+  if (center) {
+    center.x = radCX - center.w / 2;
+    center.y = radCY - center.h / 2;
+  }
 }
 
 /* -----------------------------------------------------------

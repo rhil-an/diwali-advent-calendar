@@ -40,7 +40,7 @@ class Diya {
     this.h           = initial.h;
 
     this.payload     = cfg.payload || null;
-    this.ring        = cfg.ring || 1;   // 1 = outer (10), 2 = middle (4), 3 = center (1)
+    this.ring        = cfg.ring || 1;   // 1 = outer (1–10), 2 = middle (11/12/14/15), 3 = center (13)
     this.theme       = cfg.theme       || "";
     this.description = cfg.description || "";
     this.emoji       = cfg.emoji       || "🪔";
@@ -205,10 +205,15 @@ class Diya {
     if (this.shakeFrames > 0) this.shakeFrames--;
   }
 
-  /* ── Per-frame draw ── */
-  draw() {
+  /* ── Per-frame draw ──
+     options.locked — sequential-unlock dim for days ahead of currentUnlockedDay ── */
+  draw(options = {}) {
     push();
     translate(this.getShakeOffset(), 0);
+
+    if (options.locked) {
+      drawingContext.globalAlpha *= 0.6;
+    }
 
     if (this.state === "unlit") {
       this.drawUnlit();

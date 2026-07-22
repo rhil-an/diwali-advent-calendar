@@ -18,7 +18,13 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div id="canvas-container"></div>
+  <div id="canvas-container">
+    <!-- CSS two-circle moon — shadow slides via translateX as days unlock -->
+    <div id="moon-container" class="moon-container" aria-hidden="true">
+      <div class="moon-light"></div>
+      <div id="moon-shadow" class="moon-shadow"></div>
+    </div>
+  </div>
 
   <!-- Diya and ScrollBanner classes must load before sketch -->
   <script src="diya.js"></script>
