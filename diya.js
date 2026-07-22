@@ -27,6 +27,20 @@ function randomHoldFrames() {
   return Math.floor(FLAME_HOLD_MIN + Math.random() * (FLAME_HOLD_MAX - FLAME_HOLD_MIN + 1));
 }
 
+/* ── Shared safe-play helper for the open/locked sound effects — swallows
+   both the synchronous errors try/catch already covered (e.g. no supported
+   source) and the asynchronous rejection that play() itself returns (e.g.
+   the sound file 404s), so a missing/blocked audio file never surfaces as
+   an uncaught promise rejection in the console. ── */
+function playSoundSafely(audioEl) {
+  if (!audioEl) return;
+  try {
+    audioEl.currentTime = 0;
+    const p = audioEl.play();
+    if (p && typeof p.catch === "function") p.catch(() => {});
+  } catch (_) {}
+}
+
 class Diya {
   constructor(cfg, images, openSound, lockedSound, flameFrames) {
     this.id          = cfg.id;
@@ -143,9 +157,7 @@ class Diya {
   /* ── Ignite ── */
   light() {
     if (this.state !== "unlit") return null;
-    if (this.openSound) {
-      try { this.openSound.currentTime = 0; this.openSound.play(); } catch (_) {}
-    }
+    playSoundSafely(this.openSound);
     this.state        = "lighting";
     this.animProgress = 0;
 
@@ -547,9 +559,7 @@ class Diya {
 
   /* ── Locked shake ── */
   triggerLocked() {
-    if (this.lockedSound) {
-      try { this.lockedSound.currentTime = 0; this.lockedSound.play(); } catch (_) {}
-    }
+    playSoundSafely(this.lockedSound);
     this.shakeFrames = DIYA_SHAKE_FRAMES;
   }
 
@@ -561,10 +571,6 @@ class Diya {
 
   /* ── Predicates ── */
   isLit()          { return this.state === "lit" || this.state === "lighting"; }
-  /* ── ringUnlocked is a boolean computed by the caller (sketch.js) from
-     whether every diya in the previous ring is fully lit ── */
-  canOpen(ringUnlocked) { return Boolean(ringUnlocked); }
-  handleVideoFinished() { /* diya stays lit after video closes */ }
   isVideoPayload() { return typeof this.payload === "string" && this.payload.startsWith("mp4:"); }
   isTextPayload()  { return this.payload === "text"; }
   isImagePayload() { return this.payload && !this.isVideoPayload() && !this.isTextPayload(); }

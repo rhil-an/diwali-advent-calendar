@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Diwali Advent Calendar</title>
 
+  <!-- Preload critical above-the-fold artwork so the main scene paints
+       instantly instead of popping in piece by piece. Paths are relative
+       so this also works when index.html is opened directly (file://). -->
+  <link rel="preload" as="image" href="images/diwali-background.png" />
+  <link rel="preload" as="image" href="assets/mandala/mandala-outer.png" />
+  <link rel="preload" as="image" href="assets/mandala/mandala-middle.png" />
+  <link rel="preload" as="image" href="assets/mandala/mandala-center.png" />
+
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link
@@ -25,6 +33,13 @@
       <div id="moon-shadow" class="moon-shadow"></div>
     </div>
   </div>
+
+  <!-- Calendar config, embedded as a JS global (window.DIWALI_DAYS_DATA)
+       instead of a .json file loaded via fetch(). Browsers block fetch()/XHR
+       to local files under file://, which is why this must load as a plain
+       script instead of being read with p5's loadJSON(). Regenerate this
+       file from assets/diwali_days.json via tools/sync_diwali_days_js.py. -->
+  <script src="assets/diwali-days-data.js"></script>
 
   <!-- Diya and ScrollBanner classes must load before sketch -->
   <script src="diya.js"></script>

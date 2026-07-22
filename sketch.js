@@ -149,27 +149,49 @@ const MOON_ILLUMINATION = {
 };
 
 function preload() {
-  const cb = Date.now();
-  diyaConfig = loadJSON("assets/diwali_days.json?v=" + cb);
+  // Synchronous — no fetch() involved, so this is safe under file:// too.
+  diyaConfig = loadEmbeddedDiyaConfig();
+}
 
-  bg = loadImage("images/diwali-background.png?v=" + cb);
+function setup() {
+  // Nothing is drawn until loadCoreAssets() resolves: draw() and
+  // resizeToViewport() both no-op via their `if (!bg) return;` guards below.
+  loadCoreAssets()
+    .then(finishSetup)
+    .catch((err) => console.error("Failed to load calendar assets:", err));
+}
 
-  scrollBannerImg = loadImage(`assets/banner/title-banner.png?v=${cb}`);
+/* ── Loads every image the calendar needs, then hands off to finishSetup()
+   once they've all settled. Split out of setup() because it's async (see
+   loadImageCompat() for why plain loadImage() can't be used here).
 
-  mandalaImages.outer  = loadImage(`assets/mandala/mandala-outer.png?v=${cb}`);
-  mandalaImages.middle = loadImage(`assets/mandala/mandala-middle.png?v=${cb}`);
-  mandalaImages.center = loadImage(`assets/mandala/mandala-center.png?v=${cb}`);
+   No cache-busting query string here (unlike the old loadImage() calls) —
+   these paths must match the <link rel="preload"> hrefs in index.html
+   byte-for-byte or the browser starts a second, uncached fetch instead of
+   reusing the preloaded response. It also lets normal HTTP caching speed
+   up repeat visits, which a per-load "?v=timestamp" would otherwise defeat. ── */
+async function loadCoreAssets() {
+  const [bgImg, bannerImg, outerImg, middleImg, centerImg] = await Promise.all([
+    loadImageCompat("images/diwali-background.png"),
+    loadImageCompat("assets/banner/title-banner.png"),
+    loadImageCompat("assets/mandala/mandala-outer.png"),
+    loadImageCompat("assets/mandala/mandala-middle.png"),
+    loadImageCompat("assets/mandala/mandala-center.png"),
+  ]);
+  bg               = bgImg;
+  scrollBannerImg  = bannerImg;
+  mandalaImages.outer  = outerImg;
+  mandalaImages.middle = middleImg;
+  mandalaImages.center = centerImg;
 
-  const imgPayloads = collectImagePayloads(diyaConfig);
-  imgPayloads.forEach((p) => {
-    const path = resolveImagePath(p);
-    if (path) diyaImages[p] = loadImage(path);
-  });
+  flameFrames = await Promise.all(
+    Array.from({ length: 8 }, (_, i) => {
+      const n = String(i + 1).padStart(2, "0");
+      return loadImageCompat(`assets/flame/flame_${n}.png`);
+    })
+  );
 
-  for (let i = 1; i <= 8; i++) {
-    const n = String(i).padStart(2, "0");
-    flameFrames.push(loadImage(`assets/flame/flame_${n}.png?v=${cb}`));
-  }
+  if (diyaConfig) await loadDiyaImagePayloads(diyaConfig);
 
   openSound   = new Audio("assets/open.mp3");
   lockedSound = new Audio("assets/locked.mp3");
@@ -177,28 +199,89 @@ function preload() {
   lockedSound.addEventListener("error", () => { lockedSound = null; });
 }
 
-function setup() {
+/* ── Runs once loadCoreAssets() has resolved — the old body of setup(). ── */
+function finishSetup() {
+  if (!bg) {
+    console.error("Diwali background image failed to load — check images/diwali-background.png.");
+    return;
+  }
+
   let c = createCanvas(bg.width, bg.height);
   canvasEl = c;
   c.parent("canvas-container");
   pixelDensity(Math.min(window.devicePixelRatio || 1, 2));
 
-  if (diyaConfig) {
-    ensureImagesLoaded(diyaConfig);
-    hydrateDiyas(diyaConfig);
-  } else {
-    loadJSON("assets/diwali_days.json?v=" + Date.now(), (data) => {
-      diyaConfig = data;
-      ensureImagesLoaded(data);
-      hydrateDiyas(data);
-      resizeToViewport();
-    });
-  }
+  if (diyaConfig) hydrateDiyas(diyaConfig);
 
   resizeToViewport();
   initEmbers();
   initVideoPlayer();
   initMoonPhase();
+}
+
+/* -----------------------------------------------------------
+   file:// compatibility — protocol-agnostic image loading
+   p5.js's built-in loadImage() opens with a fetch() call (used only to
+   sniff the response's Content-Type header for GIF detection) before it
+   ever touches a plain <img> element. Browsers block fetch()/XHR against
+   local files entirely under the file:// protocol (no HTTP server), so
+   loadImage() fails immediately there — even though the <img>-based pixel
+   loading it falls back to internally would have worked fine on its own.
+   This is also why the site "just worked" under Live Server / GitHub
+   Pages (both serve over http/https) but broke when index.html was opened
+   directly by double-clicking it.
+
+   loadImageCompat() below skips the fetch() and loads straight through a
+   plain <img> (exactly how a static <img src="..."> tag would), then
+   copies the decoded pixels into a real p5.Image via createImage() so the
+   rest of the sketch can keep calling image()/tint()/etc. exactly as
+   before — this works identically under file://, Live Server, and GitHub
+   Pages, so there's no branching needed by protocol.
+----------------------------------------------------------- */
+
+function loadImageCompat(path) {
+  return new Promise((resolve) => {
+    const raw = new Image();
+    raw.onload = () => {
+      const pImg = createImage(raw.naturalWidth || raw.width, raw.naturalHeight || raw.height);
+      pImg.drawingContext.drawImage(raw, 0, 0);
+      pImg.modified = true;
+      resolve(pImg);
+    };
+    raw.onerror = () => {
+      console.error("Failed to load image:", path);
+      resolve(null); // never reject — one missing asset shouldn't block the rest of the calendar
+    };
+    raw.src = path;
+  });
+}
+
+/* ── Loads any "assets/image.png"-style day payloads (see resolveImagePath)
+   the same fetch-free way as the core art above. Currently unused by the
+   shipped diwali_days.json (every day is "text" or "mp4:..."), but kept so
+   a future image-payload day works without touching this loader. ── */
+async function loadDiyaImagePayloads(config) {
+  const payloads = collectImagePayloads(config);
+  await Promise.all(payloads.map(async (p) => {
+    if (diyaImages[p]) return;
+    const path = resolveImagePath(p);
+    if (path) diyaImages[p] = await loadImageCompat(path);
+  }));
+}
+
+/* ── Reads the calendar config from window.DIWALI_DAYS_DATA (set by
+   assets/diwali-days-data.js, loaded as a plain <script> tag in index.html)
+   instead of fetching assets/diwali_days.json directly — the same fetch()
+   restriction described above also applies to p5's loadJSON(). Regenerate
+   assets/diwali-days-data.js from assets/diwali_days.json via
+   tools/sync_diwali_days_js.py whenever the JSON changes. ── */
+function loadEmbeddedDiyaConfig() {
+  if (window.DIWALI_DAYS_DATA) return window.DIWALI_DAYS_DATA;
+  console.error(
+    "window.DIWALI_DAYS_DATA not found — is assets/diwali-days-data.js " +
+    "included in index.html before sketch.js?"
+  );
+  return null;
 }
 
 function draw() {
@@ -443,6 +526,21 @@ function setAnimationLock(active) {
   if (container) container.classList.toggle("animation-locked", active);
 }
 
+/* ── Shared dispatcher for "what should open after this lamp lights/flares" —
+   used by both the first-ignite and re-click paths in handleDiyaInteraction()
+   below, so the type→popup mapping only lives in one place. ── */
+function openDiyaContent(d, result, isSpringDay) {
+  if (isSpringDay) {
+    showSpringPopup(d);
+  } else if (result?.type === "video") {
+    playVideo(result.src, d);
+  } else if (result?.type === "text") {
+    showRevealCard(d);
+  } else if (result?.type === "image") {
+    d.replayImageContent();
+  }
+}
+
 function handleDiyaInteraction(d) {
   // Guard clause: ignore every click while a lamp's fire animation is
   // still playing, so a fast second click can never interrupt/overlap it.
@@ -474,14 +572,7 @@ function handleDiyaInteraction(d) {
     // lock first, then open whatever popup/video/card this lamp triggers.
     d.onLit = () => {
       setAnimationLock(false);
-      if (isSpringDay) {
-        // Spring days: show 3D popup only — no info card
-        showSpringPopup(d);
-      } else if (result?.type === "video") {
-        playVideo(result.src, d);
-      } else if (result?.type === "text") {
-        showRevealCard(d);
-      }
+      openDiyaContent(d, result, isSpringDay);
     };
     return;
   }
@@ -499,20 +590,7 @@ function handleDiyaInteraction(d) {
     setTimeout(() => {
       teardownFlameFlare();
       setAnimationLock(false);
-
-      if (isSpringDay) {
-        // Re-click: retrigger the popup, skip the info card
-        showSpringPopup(d);
-        return;
-      }
-      const result = d.reopen();
-      if (result?.type === "video") {
-        playVideo(result.src, d);
-      } else if (result?.type === "text") {
-        showRevealCard(d);
-      } else if (result?.type === "image") {
-        d.replayImageContent();
-      }
+      openDiyaContent(d, d.reopen(), isSpringDay);
     }, FLAME_FLARE_MS);
 
     return;
@@ -531,7 +609,11 @@ function showRevealCard(diya) {
 
   dimOverlayEl = document.createElement("div");
   dimOverlayEl.className = "dim-overlay";
-  dimOverlayEl.addEventListener("click", teardownRevealCard);
+  // Only close when the click lands on the backdrop itself, not when it
+  // bubbles up from a click inside the card (now a child of the overlay).
+  dimOverlayEl.addEventListener("click", (e) => {
+    if (e.target === dimOverlayEl) teardownRevealCard();
+  });
 
   revealCardEl = document.createElement("div");
   revealCardEl.className = "reveal-card";
@@ -560,7 +642,8 @@ function showRevealCard(diya) {
   revealCardEl.querySelector(".reveal-card-close").addEventListener("click", teardownRevealCard);
 
   container.appendChild(dimOverlayEl);
-  container.appendChild(revealCardEl);
+  // Card lives inside the overlay so the overlay's flexbox centers it.
+  dimOverlayEl.appendChild(revealCardEl);
 
   if (hasImage) {
     const preload = new Image();
@@ -623,6 +706,7 @@ function showSpringPopup(diya) {
   springPopupEl.style.top    = `${popupT}px`;
 
   const img = document.createElement("img");
+  img.loading = "lazy"; // not needed on initial paint — only fetched once a lamp is clicked
   img.src = imgSrc;
   img.alt = `Day ${diya.id} surprise`;
   springPopupEl.appendChild(img);
@@ -765,6 +849,10 @@ function initVideoPlayer() {
   // ── <video> — no default controls, playsinline for mobile ──
   videoPlayerEl = document.createElement("video");
   videoPlayerEl.className = "video-overlay";
+  // No src is ever assigned until a lamp is actually clicked (see playVideo()),
+  // and preload="none" makes sure the browser doesn't eagerly buffer any of
+  // the 5 videos on page load — all 15 days' heavy assets stay lazy.
+  videoPlayerEl.setAttribute("preload", "none");
   videoPlayerEl.setAttribute("playsinline", "");
   videoPlayerEl.setAttribute("webkit-playsinline", ""); // iOS inline playback
   videoPlayerEl.playsInline = true;
@@ -1232,14 +1320,6 @@ function collectImagePayloads(config) {
     seen.add(p);
   }
   return Array.from(seen);
-}
-
-function ensureImagesLoaded(config) {
-  collectImagePayloads(config).forEach((p) => {
-    if (diyaImages[p]) return;
-    const path = resolveImagePath(p);
-    if (path) diyaImages[p] = loadImage(path);
-  });
 }
 
 function resolveImagePath(payload) {
