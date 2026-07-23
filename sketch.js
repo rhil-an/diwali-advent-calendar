@@ -61,15 +61,10 @@ const VIDEO_DAYS = {
 // Non-null while the player is visible (read by isOverlayOpen).
 let videoOverlayWrapper  = null;
 // Singleton DOM refs — built once in initVideoPlayer(), reused every playback.
-let videoPlayerContainer = null;
-let videoPlayerEl        = null;
-let videoPlayPauseBtn    = null;
-let videoVolumeSlider    = null;
-let videoFullscreenBtn   = null;
-let videoSeekBar         = null;  // full-width seek <input type="range">
-let videoTimeEl          = null;  // "M:SS / M:SS" text span
-let videoClickFeedbackEl = null;  // center play/pause ripple overlay
-let idleTimer            = null;  // auto-hide controls after 2500 ms inactivity
+// Playback UI (seeking, volume, fullscreen) is handled entirely by the
+// browser's native <video controls> — no custom control DOM is built here.
+let videoPlayerContainer = null;   // modal overlay wrapper (black backdrop)
+let videoPlayerEl        = null;   // the <video> element itself
 
 // Text/reveal card
 let revealCardEl = null;
@@ -782,379 +777,64 @@ function teardownFlameFlare() {
 }
 
 /* -----------------------------------------------------------
-   Custom video player — singleton DOM structure, reused per playback
+   Native video player — simple modal overlay, singleton DOM,
+   reused per playback. All playback UI (seek, volume, fullscreen)
+   is delegated entirely to the browser's native <video controls>.
 ----------------------------------------------------------- */
-
-/* ── Compute and apply exact pixel dimensions — mirrors advent-calendar ──
-   Called on loadedmetadata, loadeddata, canplay, and window resize.
-   The wrapper is inline-flex so it automatically hugs the video size.   */
-function applyVideoFit() {
-  if (!videoPlayerEl) return;
-  // ~55 px is the height of the custom controls bar below the video
-  const CONTROLS_H = 55;
-  const maxW = window.innerWidth  * 0.95;
-  const maxH = window.innerHeight * 0.95 - CONTROLS_H;
-  const vw = videoPlayerEl.videoWidth  || maxW;
-  const vh = videoPlayerEl.videoHeight || maxH;
-  if (vw <= 0 || vh <= 0) {
-    videoPlayerEl.style.width  = `${maxW}px`;
-    videoPlayerEl.style.height = `${maxH}px`;
-    return;
-  }
-  const ratio = vw / vh;
-  let targetW = Math.min(maxW, maxH * ratio);
-  let targetH = targetW / ratio;
-  if (targetH > maxH) {
-    targetH = maxH;
-    targetW = targetH * ratio;
-  }
-  videoPlayerEl.style.width  = `${Math.round(targetW)}px`;
-  videoPlayerEl.style.height = `${Math.round(targetH)}px`;
-}
-
-/* ── Format seconds as M:SS (e.g. 75 → "1:15") ── */
-function fmtVideoTime(secs) {
-  if (!isFinite(secs) || isNaN(secs) || secs < 0) return "0:00";
-  const m = Math.floor(secs / 60);
-  const s = Math.floor(secs % 60);
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
-
-/* ── Idle-timer: resets the 2500 ms countdown; adds/removes .idle class ── */
-function resetIdleTimer() {
-  if (!videoPlayerContainer) return;
-  videoPlayerContainer.classList.remove("idle");
-  clearTimeout(idleTimer);
-  idleTimer = setTimeout(() => {
-    if (videoPlayerContainer) videoPlayerContainer.classList.add("idle");
-  }, 2500);
-}
-
-/* ── Center ripple: briefly shows ▶/⏸ icon in the middle of the player ── */
-function showVideoClickFeedback(isNowPaused) {
-  if (!videoClickFeedbackEl) return;
-  videoClickFeedbackEl.textContent = isNowPaused ? "⏸" : "▶";
-  videoClickFeedbackEl.classList.remove("animate");
-  // Force a style recalculation so the animation always restarts
-  void videoClickFeedbackEl.offsetWidth;
-  videoClickFeedbackEl.classList.add("animate");
-}
 
 function initVideoPlayer() {
   if (videoPlayerContainer) return;
 
-  const host = document.getElementById("canvas-container");
-
-  // ── Wrapper (fullscreen target) ───────────────────────────
+  // ── Modal overlay wrapper — pure black backdrop, centers its content ──
   videoPlayerContainer = document.createElement("div");
-  videoPlayerContainer.className = "video-overlay-wrapper";
+  videoPlayerContainer.className = "video-modal-overlay";
   videoPlayerContainer.style.display = "none";
 
-  // ── <video> — no default controls, playsinline for mobile ──
+  // ── Native <video> — browser supplies all playback/seek/fullscreen UI ──
   videoPlayerEl = document.createElement("video");
-  videoPlayerEl.className = "video-overlay";
+  videoPlayerEl.className = "native-video-player";
   // No src is ever assigned until a lamp is actually clicked (see playVideo()),
   // and preload="none" makes sure the browser doesn't eagerly buffer any of
   // the 5 videos on page load — all 15 days' heavy assets stay lazy.
   videoPlayerEl.setAttribute("preload", "none");
+  videoPlayerEl.setAttribute("controls", "");
   videoPlayerEl.setAttribute("playsinline", "");
-  videoPlayerEl.setAttribute("webkit-playsinline", ""); // iOS inline playback
+  videoPlayerEl.setAttribute("autoplay", "");
+  videoPlayerEl.controls    = true;
   videoPlayerEl.playsInline = true;
-  videoPlayerEl.onended = exitVideo;
-  videoPlayerEl.onerror = () => {
-    const l = videoPlayerContainer && videoPlayerContainer.querySelector(".video-loading");
-    if (l) l.textContent = "Unable to load video.";
-  };
+  videoPlayerEl.autoplay    = true;
+  videoPlayerEl.onended     = exitVideo;
 
-  // ── Controls bar — column layout: seek bar on top, buttons row below ──
-  const controlsBar = document.createElement("div");
-  controlsBar.className = "video-controls-bar";
+  // ── Close ("X") button — top-right corner, always visible ──
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "video-modal-close";
+  closeBtn.setAttribute("aria-label", "Close video");
+  closeBtn.textContent = "✕";
+  closeBtn.addEventListener("click", exitVideo);
 
-  // ── Seek row — full-width interactive range input ──────────
-  const seekRow = document.createElement("div");
-  seekRow.className = "video-seek-row";
-
-  videoSeekBar = document.createElement("input");
-  videoSeekBar.type = "range";
-  videoSeekBar.className = "video-seek-bar";
-  videoSeekBar.min = "0";
-  videoSeekBar.max = "100";
-  videoSeekBar.step = "0.1";
-  videoSeekBar.value = "0";
-  videoSeekBar.setAttribute("aria-label", "Seek");
-  videoSeekBar.style.setProperty("--seek-pct", "0%");
-  // Dragging immediately scrubs the video
-  videoSeekBar.addEventListener("input", (e) => {
-    if (!videoPlayerEl || !isFinite(videoPlayerEl.duration)) return;
-    const pct = parseFloat(e.target.value);
-    videoPlayerEl.currentTime = (pct / 100) * videoPlayerEl.duration;
-    videoSeekBar.style.setProperty("--seek-pct", `${pct}%`);
+  // Clicking the black backdrop itself (not the video/button) also closes.
+  videoPlayerContainer.addEventListener("click", (e) => {
+    if (e.target === videoPlayerContainer) exitVideo();
   });
 
-  seekRow.appendChild(videoSeekBar);
-
-  // ── Buttons row — left group | right group ─────────────────
-  const buttonsRow = document.createElement("div");
-  buttonsRow.className = "video-buttons-row";
-
-  // Left group: Play/Pause, Volume slider, Time readout
-  const leftGroup = document.createElement("div");
-  leftGroup.className = "video-controls-left";
-
-  videoPlayPauseBtn = document.createElement("button");
-  videoPlayPauseBtn.className = "video-ctrl-btn video-ctrl-playpause";
-  videoPlayPauseBtn.setAttribute("aria-label", "Play / Pause");
-  videoPlayPauseBtn.textContent = "⏸";
-  videoPlayPauseBtn.addEventListener("click", togglePlayPause);
-
-  videoVolumeSlider = document.createElement("input");
-  videoVolumeSlider.type = "range";
-  videoVolumeSlider.className = "video-ctrl-volume";
-  videoVolumeSlider.min = "0";
-  videoVolumeSlider.max = "1";
-  videoVolumeSlider.step = "0.05";
-  videoVolumeSlider.value = "1";
-  videoVolumeSlider.setAttribute("aria-label", "Volume");
-  videoVolumeSlider.style.setProperty("--vol-pct", "100%");
-  videoVolumeSlider.addEventListener("input", (e) => {
-    const vol = parseFloat(e.target.value);
-    if (videoPlayerEl) videoPlayerEl.volume = vol;
-    videoVolumeSlider.style.setProperty("--vol-pct", `${vol * 100}%`);
-  });
-
-  videoTimeEl = document.createElement("span");
-  videoTimeEl.className = "video-time";
-  videoTimeEl.textContent = "0:00 / 0:00";
-
-  leftGroup.appendChild(videoPlayPauseBtn);
-  leftGroup.appendChild(videoVolumeSlider);
-  leftGroup.appendChild(videoTimeEl);
-
-  // Right group: Fullscreen ONLY (Exit is the top-right button)
-  const rightGroup = document.createElement("div");
-  rightGroup.className = "video-controls-right";
-
-  videoFullscreenBtn = document.createElement("button");
-  videoFullscreenBtn.className = "video-ctrl-btn video-ctrl-fullscreen";
-  videoFullscreenBtn.setAttribute("aria-label", "Enter fullscreen");
-  videoFullscreenBtn.textContent = "⛶";
-  videoFullscreenBtn.addEventListener("click", toggleVideoFullscreen);
-
-  rightGroup.appendChild(videoFullscreenBtn);
-
-  buttonsRow.appendChild(leftGroup);
-  buttonsRow.appendChild(rightGroup);
-
-  controlsBar.appendChild(seekRow);
-  controlsBar.appendChild(buttonsRow);
-
-  // ── Loading indicator ─────────────────────────────────────
-  const loading = document.createElement("div");
-  loading.className = "video-loading";
-  loading.textContent = "Loading…";
-
-  // ── Video event listeners ─────────────────────────────────
-  videoPlayerEl.addEventListener("play",  () => {
-    if (videoPlayPauseBtn) videoPlayPauseBtn.textContent = "⏸";
-    resetIdleTimer();
-  });
-  videoPlayerEl.addEventListener("pause", () => {
-    if (videoPlayPauseBtn) videoPlayPauseBtn.textContent = "▶";
-  });
-  videoPlayerEl.addEventListener("loadeddata", () => {
-    const l = videoPlayerContainer && videoPlayerContainer.querySelector(".video-loading");
-    if (l) l.style.display = "none";
-    applyVideoFit();
-  });
-  videoPlayerEl.addEventListener("canplay", () => {
-    const l = videoPlayerContainer && videoPlayerContainer.querySelector(".video-loading");
-    if (l) l.style.display = "none";
-    applyVideoFit();
-  });
-  // Fires as soon as we know the video's natural width/height
-  videoPlayerEl.addEventListener("loadedmetadata", applyVideoFit);
-  // Re-fit whenever the browser window is resized (e.g. phone orientation flip)
-  window.addEventListener("resize", applyVideoFit);
-
-  // Seek bar + time counter — driven by timeupdate
-  videoPlayerEl.addEventListener("timeupdate", () => {
-    const cur = videoPlayerEl.currentTime;
-    const dur = videoPlayerEl.duration;
-    const pct = (isFinite(dur) && dur > 0) ? (cur / dur) * 100 : 0;
-    if (videoSeekBar) {
-      videoSeekBar.value = pct;
-      videoSeekBar.style.setProperty("--seek-pct", `${pct}%`);
-    }
-    if (videoTimeEl) videoTimeEl.textContent =
-      `${fmtVideoTime(cur)} / ${fmtVideoTime(dur)}`;
-  });
-
-  // ── Click-to-toggle play/pause on the video element itself ──
-  videoPlayerEl.addEventListener("click", () => {
-    togglePlayPause();
-    showVideoClickFeedback(videoPlayerEl.paused);
-  });
-
-  // ── Idle-timer event listeners — mouse movement or touch resets the clock ──
-  videoPlayerContainer.addEventListener("mousemove",  resetIdleTimer);
-  videoPlayerContainer.addEventListener("touchstart", resetIdleTimer, { passive: true });
-
-  // ── Center play/pause ripple feedback element ──────────────
-  videoClickFeedbackEl = document.createElement("div");
-  videoClickFeedbackEl.className = "video-click-feedback";
-  videoPlayerContainer.appendChild(videoClickFeedbackEl);
-
-  // ── Fullscreen icon swap on fullscreenchange ──────────────
-  const onFsChange = () => {
-    if (!videoFullscreenBtn) return;
-    if (isVideoInFullscreen()) {
-      videoFullscreenBtn.textContent = "⊡";
-      videoFullscreenBtn.setAttribute("aria-label", "Exit fullscreen");
-      // Clear JS-set pixel dimensions so the CSS :fullscreen rules take over
-      if (videoPlayerEl) {
-        videoPlayerEl.style.width  = "";
-        videoPlayerEl.style.height = "";
-      }
-    } else {
-      videoFullscreenBtn.textContent = "⛶";
-      videoFullscreenBtn.setAttribute("aria-label", "Enter fullscreen");
-      // Unlock orientation whenever we leave fullscreen
-      try { screen.orientation.unlock(); } catch (_) {}
-      // Restore correct pixel dimensions for windowed mode
-      applyVideoFit();
-    }
-  };
-  document.addEventListener("fullscreenchange",       onFsChange);
-  document.addEventListener("webkitfullscreenchange", onFsChange);
-  document.addEventListener("mozfullscreenchange",    onFsChange);
-
-  // ── Keyboard shortcuts — only active while the player is visible ──────────
+  // ESC closes the modal whenever it's open.
   document.addEventListener("keydown", (e) => {
-    // ESC is always handled if we're in fullscreen
-    if (e.key === "Escape" && isVideoInFullscreen()) {
-      document.exitFullscreen && document.exitFullscreen().catch(() => {});
-      try { screen.orientation.unlock(); } catch (_) {}
-      return;
-    }
-
-    // All other shortcuts only fire while the player overlay is open
-    if (!videoOverlayWrapper) return;
-
-    switch (e.key) {
-      case " ":
-      case "k":
-        e.preventDefault();
-        togglePlayPause();
-        showVideoClickFeedback(videoPlayerEl.paused);
-        resetIdleTimer();
-        break;
-      case "f":
-        e.preventDefault();
-        toggleVideoFullscreen();
-        break;
-      case "ArrowRight":
-        e.preventDefault();
-        if (videoPlayerEl && isFinite(videoPlayerEl.duration)) {
-          videoPlayerEl.currentTime = Math.min(
-            videoPlayerEl.currentTime + 2, videoPlayerEl.duration
-          );
-        }
-        resetIdleTimer();
-        break;
-      case "ArrowLeft":
-        e.preventDefault();
-        if (videoPlayerEl) {
-          videoPlayerEl.currentTime = Math.max(videoPlayerEl.currentTime - 2, 0);
-        }
-        resetIdleTimer();
-        break;
-    }
+    if (e.key === "Escape" && videoOverlayWrapper) exitVideo();
   });
 
-  // ── Exit button — top-right, always visible, outside the controls bar ──
-  const exitBtn = document.createElement("button");
-  exitBtn.className = "video-exit-btn";
-  exitBtn.setAttribute("aria-label", "Exit video");
-  exitBtn.textContent = "✕";
-  exitBtn.addEventListener("click", exitVideo);
-
-  // ── Assemble & mount ──────────────────────────────────────
   videoPlayerContainer.appendChild(videoPlayerEl);
-  videoPlayerContainer.appendChild(controlsBar);
-  videoPlayerContainer.appendChild(exitBtn);
-  videoPlayerContainer.appendChild(loading);
-  host.appendChild(videoPlayerContainer);
-}
-
-/* ── Predicate: is the video container currently the fullscreen element ── */
-function isVideoInFullscreen() {
-  return Boolean(
-    document.fullscreenElement       === videoPlayerContainer ||
-    document.webkitFullscreenElement === videoPlayerContainer ||
-    document.mozFullScreenElement    === videoPlayerContainer
-  );
-}
-
-/* ── Toggle play / pause ── */
-function togglePlayPause() {
-  if (!videoPlayerEl) return;
-  if (videoPlayerEl.paused) videoPlayerEl.play();
-  else                      videoPlayerEl.pause();
-}
-
-/* ── Toggle fullscreen on the player container ── */
-function toggleVideoFullscreen() {
-  if (!videoPlayerContainer) return;
-  if (isVideoInFullscreen()) {
-    (document.exitFullscreen ||
-     document.webkitExitFullscreen ||
-     document.mozCancelFullScreen
-    ).call(document).catch(() => {});
-    try { screen.orientation.unlock(); } catch (_) {}
-  } else {
-    const req = videoPlayerContainer.requestFullscreen ||
-                videoPlayerContainer.webkitRequestFullscreen ||
-                videoPlayerContainer.mozRequestFullScreen;
-    if (req) {
-      req.call(videoPlayerContainer)
-        .then(() => {
-          // Lock to landscape; iOS may reject — swallow the error silently
-          try {
-            const lockP = screen.orientation.lock("landscape");
-            if (lockP && typeof lockP.catch === "function") lockP.catch(() => {});
-          } catch (_) {}
-        })
-        .catch(() => {});
-    }
-  }
+  videoPlayerContainer.appendChild(closeBtn);
+  document.body.appendChild(videoPlayerContainer);
 }
 
 /* ── Clean exit: pause, dump src, hide overlay ── */
 function exitVideo() {
-  // Clear idle timeout and restore cursor before hiding
-  clearTimeout(idleTimer);
-  idleTimer = null;
-  if (videoPlayerContainer) videoPlayerContainer.classList.remove("idle");
-
-  if (isVideoInFullscreen()) {
-    try { document.exitFullscreen(); } catch (_) {}
-    try { screen.orientation.unlock(); } catch (_) {}
-  }
   if (videoPlayerEl) {
     videoPlayerEl.pause();
     videoPlayerEl.src = "";
     videoPlayerEl.load();
   }
-  if (videoPlayerContainer) {
-    videoPlayerContainer.style.display = "none";
-    const l = videoPlayerContainer.querySelector(".video-loading");
-    if (l) { l.style.display = ""; l.textContent = "Loading…"; }
-  }
-  if (videoSeekBar) {
-    videoSeekBar.value = "0";
-    videoSeekBar.style.setProperty("--seek-pct", "0%");
-  }
-  if (videoTimeEl) videoTimeEl.textContent = "0:00 / 0:00";
+  if (videoPlayerContainer) videoPlayerContainer.style.display = "none";
   videoOverlayWrapper = null;
 }
 
@@ -1164,27 +844,14 @@ function playVideo(src) {
   teardownSpringPopup();   // dismiss any active 3D popup so it can't overlap the video
   initVideoPlayer();
 
-  // Reset loading spinner
-  const l = videoPlayerContainer.querySelector(".video-loading");
-  if (l) { l.style.display = ""; l.textContent = "Loading…"; }
-
-  // Restore volume from slider (user may have adjusted it previously)
-  videoPlayerEl.volume = parseFloat(videoVolumeSlider ? videoVolumeSlider.value : "1");
-
   videoPlayerEl.src = src;
   videoPlayerEl.load();
-  videoPlayerContainer.style.display = "";
+  videoPlayerContainer.style.display = "flex";
   videoOverlayWrapper = videoPlayerContainer;
-
-  // Fire an immediate fit in case metadata is already cached from a prior play
-  applyVideoFit();
-
-  // Start idle countdown as soon as the player is visible
-  resetIdleTimer();
 
   const p = videoPlayerEl.play();
   if (p && typeof p.then === "function") {
-    p.catch(() => { /* autoplay blocked — user can tap ▶ */ });
+    p.catch(() => { /* autoplay blocked — user can tap the native play button */ });
   }
 }
 
