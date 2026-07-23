@@ -93,7 +93,9 @@ canvas {
 .dim-overlay {
   position: absolute;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   z-index: 15;
   cursor: pointer;
   /* Flexbox perfectly centers the card (its only child) both ways,
@@ -110,13 +112,16 @@ canvas {
   to   { opacity: 1; }
 }
 
+/* ── Card shell — flex column so the header can stay fixed while only the
+   body (the text) scrolls internally. Sized generously on mobile but capped
+   on desktop so the mandala background behind it always stays visible. ── */
 .reveal-card {
   position: relative;
   z-index: 20;
   cursor: default; /* card content isn't part of the "click backdrop to close" target */
-  width: 70%;
-  max-width: 350px;
-  max-height: 40vh;
+  width: 90%;
+  max-width: 400px;
+  max-height: 75vh;
   display: flex;
   flex-direction: column;
   background:
@@ -134,6 +139,14 @@ canvas {
   animation: cardReveal 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
+/* PC — slightly shorter cap so the card reads as a compact panel, not a
+   full-height sheet, on tall desktop viewports. */
+@media (min-width: 768px) {
+  .reveal-card {
+    max-height: 65vh;
+  }
+}
+
 @keyframes cardReveal {
   from { transform: scale(0.82); opacity: 0; }
   to   { transform: scale(1);    opacity: 1; }
@@ -148,20 +161,25 @@ canvas {
   font-size: 14px;
   opacity: 0.6;
   pointer-events: none;
+  z-index: 3;
 }
 .reveal-card:not(.has-image)::before { top: 14px;    left: 18px; }
 .reveal-card:not(.has-image)::after  { bottom: 14px; right: 18px; }
 
-/* ── Hero-style image card (inspired by thenosamchronicles.com book cards):
-     full-bleed photo, dark bottom scrim, content anchored over the scrim ── */
-.reveal-card.has-image {
-  min-height: clamp(300px, 60vh, 420px);
-  max-height: 80vh;
+/* ── Header — image, badge/title/divider, and the close button. Never
+   squishes or scrolls; only the body below it scrolls. ── */
+.card-header {
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* Hero-style photo banner (inspired by thenosamchronicles.com book cards):
+   full-bleed photo confined to the header's height, dark bottom scrim,
+   labels anchored over the scrim at the header's base. */
+.reveal-card.has-image .card-header {
+  height: clamp(150px, 32vh, 210px);
   overflow: hidden;                 /* clips the Ken Burns zoom on the photo layer */
   background-color: #1c0900;        /* fallback tone while loading / if the photo 404s */
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
 }
 
 /* Photo lives on its own layer (not the card background) so it can be
@@ -191,43 +209,51 @@ canvas {
     rgba(15, 5, 0, 0)    0%,
     rgba(15, 5, 0, 0.10) 22%,
     rgba(14, 4, 0, 0.62) 46%,
-    rgba(10, 3, 0, 0.95) 72%,
     rgba(10, 3, 0, 0.98) 100%
   );
   pointer-events: none;
 }
 
-.card-content {
+.card-header-info {
   position: relative;
   z-index: 2;
-  padding: 30px 30px 32px;
-  overflow-y: auto;                    /* long content scrolls within the card */
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-y;                 /* allow vertical scroll inside the card */
-  /* Without this, the flex item's default min-height (based on content)
-     would let long text push the card past max-height instead of scrolling. */
-  min-height: 0;
 }
 
-/* Extra gradient sized to the content box itself (not the whole card) so
-   text stays legible no matter how tall the card is or how bright the photo
-   is behind it — a fixed guarantee on top of the full-card scrim above. */
-.reveal-card.has-image .card-content {
-  padding-top: 46px;
-  background: linear-gradient(
-    180deg,
-    rgba(10, 3, 0, 0)    0%,
-    rgba(9, 3, 0, 0.78)  38%,
-    rgba(7, 2, 0, 0.95)  100%
-  );
+.reveal-card.has-image .card-header-info {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 16px 20px 14px;
 }
 
-.reveal-card:not(.has-image) .card-content {
-  padding: 38px 34px 30px;
+.reveal-card:not(.has-image) .card-header-info {
+  padding: 30px 30px 4px;
   text-align: center;
 }
 
-/* Close button — clearly visible circular button, top-right */
+/* ── Body — the only part that scrolls. flex-grow + min-height: 0 let the
+   flex item shrink below its content size so overflow-y: auto can kick in
+   instead of stretching the card past max-height. ── */
+.card-body-wrap {
+  position: relative;
+  z-index: 2;
+  flex-grow: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;                 /* allow vertical scroll inside the card */
+  min-height: 0;
+  padding: 20px 10px 8px 24px;
+}
+
+.reveal-card:not(.has-image) .card-body-wrap {
+  padding: 12px 10px 8px 24px;
+  text-align: center;
+}
+
+/* Close button — clearly visible circular button, top-right of the header
+   (absolutely positioned relative to .card-header, so it always stays put
+   even when the body content scrolls). */
 .reveal-card-close {
   position: absolute;
   top: 12px;
@@ -250,6 +276,7 @@ canvas {
 .reveal-card.has-image .reveal-card-close {
   background: rgba(10, 3, 0, 0.55);
   backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 .reveal-card-close:hover {
   background: rgba(184, 120, 10, 0.40);
@@ -262,7 +289,7 @@ canvas {
   align-items: center;
   gap: 6px;
   font-family: 'Cinzel', serif;
-  font-size: 11px;
+  font-size: 10.5px;
   letter-spacing: 2.5px;
   color: #FFD700;
   text-transform: uppercase;
@@ -270,16 +297,16 @@ canvas {
   border: 1px solid #b8780a;
   border-radius: 999px;
   padding: 6px 14px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 .card-title {
   font-family: 'Cinzel', serif;
-  font-size: clamp(20px, 5vw, 25px);
+  font-size: clamp(18px, 5vw, 24px);
   font-weight: 700;
   color: #FFD700;
   text-shadow: 0 0 22px rgba(255, 215, 0, 0.45);
-  margin-bottom: 14px;
+  margin-bottom: 12px;
   line-height: 1.25;
 }
 
@@ -287,24 +314,40 @@ canvas {
   width: 55px;
   height: 1.5px;
   background: linear-gradient(90deg, #b8780a, transparent);
-  margin: 0 0 16px;
+  margin: 0;
 }
 
 .reveal-card:not(.has-image) .card-divider {
   background: linear-gradient(90deg, transparent, #b8780a, transparent);
-  margin: 0 auto 16px;
+  margin: 0 auto;
 }
 
 .card-body {
-  font-size: clamp(13px, 3.6vw, 14.5px);
+  font-size: clamp(12.5px, 3.6vw, 14.5px);
   line-height: 1.75;
   color: #f0d07a;
   font-weight: 300;
+  /* Subtle bottom padding so the last line never feels cut off abruptly
+     when scrolled all the way down. */
+  padding-bottom: 24px;
 }
 
 .reveal-card.has-image .card-body {
   color: #f5e2b8;
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+}
+
+/* Desktop — slightly larger type now that there's more room to breathe */
+@media (min-width: 768px) {
+  .card-badge {
+    font-size: 11px;
+  }
+  .card-title {
+    font-size: clamp(20px, 2.4vw, 25px);
+  }
+  .card-body {
+    font-size: 14.5px;
+  }
 }
 
 /* ─────────────────────────────────────────

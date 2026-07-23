@@ -629,12 +629,16 @@ function showRevealCard(diya) {
   if (hasImage) revealCardEl.classList.add("has-image", "image-loading");
 
   revealCardEl.innerHTML = `
-    <button class="reveal-card-close" aria-label="Close">×</button>
-    ${hasImage ? '<div class="card-image-photo" role="img" aria-label="' + diya.theme + '"></div><div class="card-image-scrim"></div>' : ""}
-    <div class="card-content">
-      <span class="card-badge">${diya.emoji} ${phase}</span>
-      <div class="card-title">${diya.theme}</div>
-      <div class="card-divider"></div>
+    <div class="card-header">
+      <button class="reveal-card-close" aria-label="Close">×</button>
+      ${hasImage ? '<div class="card-image-photo" role="img" aria-label="' + diya.theme + '"></div><div class="card-image-scrim"></div>' : ""}
+      <div class="card-header-info">
+        <span class="card-badge">${diya.emoji} ${phase}</span>
+        <div class="card-title">${diya.theme}</div>
+        <div class="card-divider"></div>
+      </div>
+    </div>
+    <div class="card-body-wrap">
       <div class="card-body">${diya.description}</div>
     </div>
   `;
