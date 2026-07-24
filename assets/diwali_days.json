@@ -4,6 +4,8 @@
     "payloadTypes": "text | assets/image.png | mp4:assets/video.mp4",
     "background": "images/diwali-background.png (664x997)"
   },
+  "lampScale": 1.1,
+  "_lampScaleNote": "Global size multiplier applied to every diya's pos.w/pos.h at load time (see hydrateDiyas() in sketch.js). 1 = default size, 1.15 = 15% bigger, 0.9 = 10% smaller. Each lamp keeps its own centre point, so scaling grows/shrinks it in place instead of shifting it. To resize just ONE lamp, edit that diya's own pos.w/pos.h below instead — lampScale multiplies on top of those.",
   "mandala": {
     "cx": 0.5,
     "cy": 0.7,

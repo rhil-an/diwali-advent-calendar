@@ -3,11 +3,15 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  /* Kills the grey/blue flash Android & iOS Safari paint on tap — every
+     interactive element gets its own deliberate hover/active state instead. */
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* ─── Root — prevent browser gesture interference ─── */
 html, body {
   overscroll-behavior: none;   /* kills pull-to-refresh / rubber-band scroll */
+  height: 100%;
 }
 
 /* ─── Body — deep indigo night ─── */
@@ -18,10 +22,21 @@ body {
     radial-gradient(ellipse at center, #16163a 0%, #0D0D2B 70%);
   background-color: #0D0D2B;
   min-height: 100vh;
+  min-height: 100dvh; /* accounts for mobile browser chrome (address bar) */
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: 'Poppins', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Warm gold text-selection to match the festival palette instead of the
+   default blue system highlight. */
+::selection {
+  background: rgba(255, 189, 61, 0.35);
+  color: #fff3d6;
 }
 
 /* ─── Canvas container ─── */
@@ -46,7 +61,12 @@ canvas {
   max-width: 100vw;
   height: auto !important;
   max-height: 100vh;
+  max-height: 100dvh;
   object-fit: contain;
+  /* Tapping a diya shouldn't wait out the browser's double-tap-to-zoom
+     delay, and shouldn't show a tap-highlight flash either. */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* ─────────────────────────────────────────
@@ -87,6 +107,42 @@ canvas {
 }
 
 /* ─────────────────────────────────────────
+   Progress badge — "X / 15 unlocked" readout
+───────────────────────────────────────── */
+
+.progress-badge {
+  position: absolute;
+  /* top/right are set from JS (syncProgressBadgePosition in sketch.js),
+     pinned just under the bottom-right corner of the scroll banner (itself
+     measured off the canvas's own bounding box, not the viewport), so the
+     badge always stays inside the calendar artwork — even when the canvas
+     is letterboxed away from the screen edges. */
+  z-index: 5;                 /* above canvas art, but naturally covered by
+                                  .dim-overlay (15) / video modal when open */
+  font-family: 'Cinzel', serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: #FFD700;
+  background: rgba(28, 9, 0, 0.55);
+  border: 1px solid rgba(184, 120, 10, 0.75);
+  border-radius: 999px;
+  padding: 6px 13px;
+  pointer-events: none;       /* purely informational, never blocks taps */
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  user-select: none;
+}
+
+@media (min-width: 768px) {
+  .progress-badge {
+    font-size: 12px;
+    padding: 7px 15px;
+  }
+}
+
+/* ─────────────────────────────────────────
    Cultural reveal card
 ───────────────────────────────────────── */
 
@@ -103,8 +159,12 @@ canvas {
   display: flex;
   align-items: center;
   justify-content: center;
+  /* Generous tap-safe margin around the card, padded further on notched
+     phones so the close button never sits under a hardware cutout. */
   padding: 24px;
-  animation: overlayFadeIn 0.55s ease forwards;
+  padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right))
+            max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
+  animation: overlayFadeIn 0.3s ease forwards;
 }
 
 @keyframes overlayFadeIn {
@@ -121,7 +181,7 @@ canvas {
   cursor: default; /* card content isn't part of the "click backdrop to close" target */
   width: 90%;
   max-width: 400px;
-  max-height: 75vh;
+  max-height: min(75vh, 75dvh);
   display: flex;
   flex-direction: column;
   background:
@@ -133,16 +193,26 @@ canvas {
   /* Distinct drop shadow lifts the card off the dimmed backdrop, layered
      with the original warm glow for a premium, floating feel. */
   box-shadow:
-    0 10px 30px rgba(0, 0, 0, 0.5),
-    0 0 50px rgba(255, 150, 0, 0.22),
+    0 12px 36px rgba(0, 0, 0, 0.55),
+    0 0 55px rgba(255, 150, 0, 0.22),
     inset 0 0 40px rgba(255, 110, 0, 0.06);
-  animation: cardReveal 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: cardReveal 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
-/* PC — slightly shorter cap so the card reads as a compact panel, not a
-   full-height sheet, on tall desktop viewports. */
+/* Small/large phones — a touch wider once there's room, so the two-line
+   title and body copy don't feel cramped on 400px+ wide screens. */
+@media (min-width: 400px) {
+  .reveal-card {
+    max-width: 420px;
+  }
+}
+
+/* Tablet & desktop — slightly shorter height cap so the card reads as a
+   compact panel, not a full-height sheet, on tall viewports; a bit wider
+   too now there's room to breathe without crowding the mandala backdrop. */
 @media (min-width: 768px) {
   .reveal-card {
+    max-width: 440px;
     max-height: 65vh;
   }
 }
@@ -240,31 +310,53 @@ canvas {
   z-index: 2;
   flex-grow: 1;
   overflow-y: auto;
+  overscroll-behavior-y: contain;      /* scroll chaining never bleeds into the page behind it */
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;                 /* allow vertical scroll inside the card */
   min-height: 0;
-  padding: 20px 10px 8px 24px;
+  padding: 18px 16px 8px 24px;
 }
 
 .reveal-card:not(.has-image) .card-body-wrap {
-  padding: 12px 10px 8px 24px;
+  padding: 12px 16px 8px 24px;
   text-align: center;
+}
+
+/* Themed, slim scrollbar — reads as an intentional part of the card
+   instead of a jarring default system scrollbar, on browsers that support it. */
+.card-body-wrap {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(184, 120, 10, 0.65) transparent;
+}
+.card-body-wrap::-webkit-scrollbar {
+  width: 6px;
+}
+.card-body-wrap::-webkit-scrollbar-track {
+  background: transparent;
+}
+.card-body-wrap::-webkit-scrollbar-thumb {
+  background-color: rgba(184, 120, 10, 0.55);
+  border-radius: 999px;
+}
+.card-body-wrap::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 189, 61, 0.7);
 }
 
 /* Close button — clearly visible circular button, top-right of the header
    (absolutely positioned relative to .card-header, so it always stays put
-   even when the body content scrolls). */
+   even when the body content scrolls). Sized generously by default so it's
+   comfortable to tap on any device, not just coarse-pointer ones. */
 .reveal-card-close {
   position: absolute;
   top: 12px;
   right: 12px;
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   border: 1.5px solid #b8780a;
-  background: rgba(184, 120, 10, 0.15);
+  background: rgba(184, 120, 10, 0.18);
   color: #FFD700;
-  font-size: 18px;
+  font-size: 19px;
   line-height: 1;
   cursor: pointer;
   display: flex;
@@ -283,6 +375,14 @@ canvas {
   border-color: #FFD700;
   transform: scale(1.12);
 }
+.reveal-card-close:active {
+  transform: scale(0.96);
+}
+.reveal-card-close:focus-visible,
+.video-modal-close:focus-visible {
+  outline: 2px solid #FFD700;
+  outline-offset: 2px;
+}
 
 .card-badge {
   display: inline-flex;
@@ -290,7 +390,7 @@ canvas {
   gap: 6px;
   font-family: 'Cinzel', serif;
   font-size: 10.5px;
-  letter-spacing: 2.5px;
+  letter-spacing: 2px;
   color: #FFD700;
   text-transform: uppercase;
   background: rgba(184, 120, 10, 0.22);
@@ -298,16 +398,22 @@ canvas {
   border-radius: 999px;
   padding: 6px 14px;
   margin-bottom: 12px;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .card-title {
   font-family: 'Cinzel', serif;
-  font-size: clamp(18px, 5vw, 24px);
+  font-size: clamp(19px, 5vw, 24px);
   font-weight: 700;
   color: #FFD700;
   text-shadow: 0 0 22px rgba(255, 215, 0, 0.45);
   margin-bottom: 12px;
-  line-height: 1.25;
+  line-height: 1.3;
+  letter-spacing: 0.2px;
+  overflow-wrap: break-word;
 }
 
 .card-divider {
@@ -323,10 +429,11 @@ canvas {
 }
 
 .card-body {
-  font-size: clamp(12.5px, 3.6vw, 14.5px);
-  line-height: 1.75;
+  font-size: clamp(13.5px, 3.6vw, 14.5px);
+  line-height: 1.8;
   color: #f0d07a;
   font-weight: 300;
+  letter-spacing: 0.1px;
   /* Subtle bottom padding so the last line never feels cut off abruptly
      when scrolled all the way down. */
   padding-bottom: 24px;
@@ -365,21 +472,28 @@ canvas {
   display: none;               /* toggled to flex in JS when a video opens */
   align-items: center;
   justify-content: center;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+            max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
 }
 
 .native-video-player {
   display: block;
   max-width: 90vw;
   max-height: 85vh;
+  max-height: 85dvh;
   margin: auto;
   background: #000;
+  border-radius: 10px;
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.6),
+    0 0 0 1.5px rgba(184, 120, 10, 0.5);
 }
 
 /* ── Close ("X") button — fixed top-right corner of the modal ── */
 .video-modal-close {
   position: absolute;
-  top: 20px;
-  right: 20px;
+  top: max(20px, env(safe-area-inset-top));
+  right: max(20px, env(safe-area-inset-right));
   z-index: 10000;
   width: 40px;
   height: 40px;
@@ -401,6 +515,9 @@ canvas {
   border-color: #FFD700;
   transform: scale(1.08);
 }
+.video-modal-close:active {
+  transform: scale(0.94);
+}
 
 /* ─────────────────────────────────────────
    Touch devices — larger tap targets
@@ -416,8 +533,8 @@ canvas {
     width: 44px;
     height: 44px;
     font-size: 22px;
-    top: 12px;
-    right: 12px;
+    top: max(12px, env(safe-area-inset-top));
+    right: max(12px, env(safe-area-inset-right));
   }
 }
 
@@ -441,7 +558,10 @@ canvas {
 
 .spring-popup {
   position: fixed;
-  pointer-events: none;       /* never blocks lamp clicks */
+  /* Interactive so a tap dismisses it early (see sketch.js) — it sits
+     directly over the lamp it belongs to, so this doesn't block anything
+     else on the canvas. */
+  cursor: pointer;
   z-index: 100;               /* above diyas/canvas but below the video overlay (9999) */
   transform-origin: center center;
   animation: springPopIn 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
@@ -452,6 +572,7 @@ canvas {
   height: 100%;
   object-fit: contain;
   filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.55));
+  pointer-events: none; /* clicks land on the wrapper so dismiss always fires */
 }
 
 .spring-popup.spring-popup-out {
@@ -499,5 +620,28 @@ canvas {
 
 .flame-flare.is-flaring {
   animation: flame-burst 800ms ease-out forwards;
+}
+
+/* ─────────────────────────────────────────
+   Accessibility — respect "reduce motion"
+   Only the animations with no JS timer/animationend dependency are toned
+   down here (card reveal, overlay fade, Ken Burns photo zoom). The spring
+   popup and flame-flare animations are left alone since sketch.js times
+   their teardown to match the animation's own duration.
+───────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .dim-overlay {
+    animation-duration: 0.01ms;
+  }
+  .reveal-card {
+    animation-duration: 0.01ms;
+  }
+  .card-image-photo {
+    animation: none;
+    transform: scale(1);
+  }
+  .moon-shadow {
+    transition-duration: 0.01ms;
+  }
 }
 

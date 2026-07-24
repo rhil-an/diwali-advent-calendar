@@ -124,6 +124,10 @@ let currentUnlockedDay = 1;
 let moonContainerEl    = null;
 let moonShadowEl       = null;
 
+// Progress badge — small "X / 15" readout, kept in sync with currentUnlockedDay.
+const TOTAL_DAYS      = 15;
+let progressBadgeEl   = null;
+
 // Illumination % per calendar day (from lunar-cycle CSV mapping)
 const MOON_ILLUMINATION = {
   1:  100,
@@ -212,6 +216,7 @@ function finishSetup() {
   initEmbers();
   initVideoPlayer();
   initMoonPhase();
+  initProgressBadge();
 }
 
 /* -----------------------------------------------------------
@@ -293,6 +298,7 @@ function draw() {
   drawSceneBrightness();
   drawCredits();
   drawEmbers();
+  drawNextUnlockHint();
 
   for (let d of diyas) {
     d.update();
@@ -318,6 +324,7 @@ function resizeToViewport() {
   }
   rebuildEmbers();
   syncMoonPosition();
+  syncProgressBadgePosition();
 }
 
 /* -----------------------------------------------------------
@@ -348,6 +355,30 @@ function updateMoonPhase(day) {
   moonShadowEl.style.transform = `translateX(${tx}%)`;
 }
 
+/* -----------------------------------------------------------
+   Progress badge — "X / 15" readout of how many days are unlocked
+----------------------------------------------------------- */
+
+function initProgressBadge() {
+  const container = document.getElementById("canvas-container");
+  if (!container) return;
+
+  progressBadgeEl = document.createElement("div");
+  progressBadgeEl.className = "progress-badge";
+  progressBadgeEl.setAttribute("aria-live", "polite");
+  progressBadgeEl.setAttribute("aria-label", "Days unlocked");
+  container.appendChild(progressBadgeEl);
+
+  updateProgressBadge();
+  syncProgressBadgePosition();
+}
+
+function updateProgressBadge() {
+  if (!progressBadgeEl) return;
+  const unlocked = Math.min(Math.max(currentUnlockedDay - 1, 0), TOTAL_DAYS);
+  progressBadgeEl.textContent = `${unlocked} / ${TOTAL_DAYS}`;
+}
+
 function syncMoonPosition() {
   if (!moonContainerEl) moonContainerEl = document.getElementById("moon-container");
   if (!moonContainerEl || !canvasEl || !canvasEl.elt) return;
@@ -365,6 +396,43 @@ function syncMoonPosition() {
   moonContainerEl.style.height = `${size}px`;
   moonContainerEl.style.left   = `${cr.left - pr.left + cr.width * 0.22 - size / 2}px`;
   moonContainerEl.style.top    = `${cr.top  - pr.top  + cr.height * 0.07 - size / 2}px`;
+}
+
+/* ── Keeps the progress badge tucked just under the bottom-right corner of
+   the "Countdown to Diwali" scroll banner, so it reads as an accent on the
+   banner rather than a floating HUD element. Falls back to a fixed inset
+   near the canvas's top-right corner if the banner hasn't hydrated yet.
+   Uses `right`/`top` (not `left`) so it tracks the canvas's own edges
+   regardless of how much letterbox space surrounds it. ── */
+function syncProgressBadgePosition() {
+  if (!progressBadgeEl || !canvasEl || !canvasEl.elt) return;
+
+  const canvas = canvasEl.elt;
+  const parent = canvas.parentElement;
+  if (!parent) return;
+
+  const cr = canvas.getBoundingClientRect();
+  const pr = parent.getBoundingClientRect();
+
+  let rightFrac = 0.05;
+  let topFrac   = 0.045;
+
+  if (scrollBanner && scrollBanner.image && scrollBanner.image.width) {
+    // Mirrors the box math in ScrollBanner.draw(): bannerW is a fraction of
+    // canvas width; bannerH follows the banner artwork's own aspect ratio.
+    const bannerWFrac = scrollBanner.w;
+    const bannerHFrac = bannerWFrac * (width / height) *
+      (scrollBanner.image.height / scrollBanner.image.width);
+
+    const bannerRightFrac  = scrollBanner.x + bannerWFrac / 2;
+    const bannerBottomFrac = scrollBanner.y + bannerHFrac / 2;
+
+    rightFrac = Math.max(0.01, 1 - bannerRightFrac);
+    topFrac   = bannerBottomFrac + 0.012; // small gap below the ribbon
+  }
+
+  progressBadgeEl.style.right = `${pr.right - cr.right + cr.width * rightFrac}px`;
+  progressBadgeEl.style.top   = `${cr.top - pr.top + cr.height * topFrac}px`;
 }
 
 /* -----------------------------------------------------------
@@ -388,6 +456,41 @@ function drawSceneBrightness() {
   ctx.save();
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, width, height);
+  ctx.restore();
+}
+
+/* -----------------------------------------------------------
+   "Next lamp" hint — soft pulsing glow behind whichever diya is next
+   in the sequential-unlock order, so it's easy to spot at a glance
+   once the mandala fills up with already-lit lamps. Purely decorative;
+   reads currentUnlockedDay/diya state but never modifies it.
+----------------------------------------------------------- */
+
+function drawNextUnlockHint() {
+  if (isAnimating) return;
+
+  const next = diyas.find((d) => d.id === currentUnlockedDay && d.state === "unlit");
+  if (!next) return;
+
+  const cx = next.px() + next.pw() / 2;
+  const cy = next.py() + next.ph() / 2;
+  const w  = next.pw();
+
+  // 0.1–1.0 breathing pulse, independent of the flame-flicker timing elsewhere.
+  const pulse = 0.55 + Math.sin(frameCount * 0.06) * 0.45;
+  const r     = w * (0.95 + pulse * 0.35);
+
+  const ctx  = drawingContext;
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+  grad.addColorStop(0,    `rgba(255, 214, 110, ${0.32 * pulse})`);
+  grad.addColorStop(0.55, `rgba(255, 170, 40, ${0.16 * pulse})`);
+  grad.addColorStop(1,    "rgba(255, 140, 0, 0)");
+
+  ctx.save();
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, TWO_PI);
+  ctx.fill();
   ctx.restore();
 }
 
@@ -559,6 +662,7 @@ function handleDiyaInteraction(d) {
     if (d.id === currentUnlockedDay) {
       currentUnlockedDay = Math.min(currentUnlockedDay + 1, 16);
       updateMoonPhase(Math.min(currentUnlockedDay, 15));
+      updateProgressBadge();
     }
 
     // Fires exactly once, the frame the flame finishes growing and the
@@ -612,6 +716,9 @@ function showRevealCard(diya) {
 
   revealCardEl = document.createElement("div");
   revealCardEl.className = "reveal-card";
+  revealCardEl.setAttribute("role", "dialog");
+  revealCardEl.setAttribute("aria-modal", "true");
+  revealCardEl.setAttribute("aria-label", diya.theme);
 
   const daysUntil = 11 - diya.id;
   const phase = diya.id >= 11
@@ -703,6 +810,9 @@ function showSpringPopup(diya) {
   springPopupEl.style.height = `${SIZE}px`;
   springPopupEl.style.left   = `${popupL}px`;
   springPopupEl.style.top    = `${popupT}px`;
+  // Tapping the popup dismisses it early instead of waiting out the full
+  // auto-dismiss timer (see dismissSpringPopup()).
+  springPopupEl.addEventListener("click", dismissSpringPopup);
 
   const img = document.createElement("img");
   img.loading = "lazy"; // not needed on initial paint — only fetched once a lamp is clicked
@@ -719,12 +829,12 @@ function showSpringPopup(diya) {
 
 function dismissSpringPopup() {
   if (!springPopupEl) return;
+  if (springPopupTimer) { clearTimeout(springPopupTimer); springPopupTimer = null; }
   springPopupEl.classList.add("spring-popup-out");
   // Remove from DOM once the exit animation finishes.
   const el = springPopupEl;
   el.addEventListener("animationend", () => el.remove(), { once: true });
-  springPopupEl    = null;
-  springPopupTimer = null;
+  springPopupEl = null;
 }
 
 function teardownSpringPopup() {
@@ -789,6 +899,9 @@ function initVideoPlayer() {
   videoPlayerContainer = document.createElement("div");
   videoPlayerContainer.className = "video-modal-overlay";
   videoPlayerContainer.style.display = "none";
+  videoPlayerContainer.setAttribute("role", "dialog");
+  videoPlayerContainer.setAttribute("aria-modal", "true");
+  videoPlayerContainer.setAttribute("aria-label", "Video player");
 
   // ── Native <video> — browser supplies all playback/seek/fullscreen UI ──
   videoPlayerEl = document.createElement("video");
@@ -817,9 +930,15 @@ function initVideoPlayer() {
     if (e.target === videoPlayerContainer) exitVideo();
   });
 
-  // ESC closes the modal whenever it's open.
+  // ESC closes whichever overlay is currently on top (video > reveal card >
+  // spring popup), mirroring the existing backdrop-click / tap-to-dismiss
+  // behaviour for each. Registered once here since initVideoPlayer() itself
+  // is only ever called once (guarded by the early-return above).
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && videoOverlayWrapper) exitVideo();
+    if (e.key !== "Escape") return;
+    if (videoOverlayWrapper)   exitVideo();
+    else if (revealCardEl)     teardownRevealCard();
+    else if (springPopupEl)    dismissSpringPopup();
   });
 
   videoPlayerContainer.appendChild(videoPlayerEl);
@@ -970,6 +1089,24 @@ function hydrateDiyas(data) {
 
   diyas = data.diyas.map((cfg) => new Diya(cfg, diyaImages, openSound, lockedSound, flameFrames));
 
+  // Global lamp-size multiplier (see "lampScale" in diwali_days.json).
+  // Applied right after construction — before ring bucketing/radial layout —
+  // so every downstream calculation (hit-testing, flame/glow size, radial
+  // centering) already sees the final scaled w/h. Each lamp's own midpoint
+  // is preserved so scaling grows/shrinks it in place rather than shifting
+  // it toward its top-left corner.
+  const lampScale = Number(data.lampScale) > 0 ? Number(data.lampScale) : 1;
+  if (lampScale !== 1) {
+    for (const d of diyas) {
+      const cx = d.x + d.w / 2;
+      const cy = d.y + d.h / 2;
+      d.w *= lampScale;
+      d.h *= lampScale;
+      d.x = cx - d.w / 2;
+      d.y = cy - d.h / 2;
+    }
+  }
+
   ringDiyas = { 1: [], 2: [], 3: [] };
   for (const d of diyas) {
     if (!ringDiyas[d.ring]) ringDiyas[d.ring] = [];
@@ -977,7 +1114,7 @@ function hydrateDiyas(data) {
   }
 
   // Override x/y positions with radial/petal geometry when the config block exists.
-  // pos.w and pos.h from the JSON are always preserved.
+  // pos.w and pos.h (already lamp-scaled above) are always preserved.
   if (data.radialLayout) computeRadialPositions(data.radialLayout, diyas);
 }
 
