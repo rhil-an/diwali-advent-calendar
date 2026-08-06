@@ -57,6 +57,7 @@ class Diya {
     this.ring        = cfg.ring || 1;   // 1 = outer (1–10), 2 = middle (11/12/14/15), 3 = center (13)
     this.theme       = cfg.theme       || "";
     this.description = cfg.description || "";
+    this.experience  = window.DIWALI_EXPERIENCES?.[cfg.id] || cfg.experience || null;
     this.emoji       = cfg.emoji       || "🪔";
     this.special     = cfg.special     || false;
     this.tint        = cfg.tint        || null;    // [R, G, B] jewel tone for special diyas
@@ -498,17 +499,30 @@ class Diya {
   drawDayLabel(x, y, w, h, alpha) {
     if (alpha <= 0) return;
     // Position text in the visual centre of the shallow bowl
-    // Bowl: rimY = y + h*0.52, depth bH = h*0.30 → centre at y + h*0.67
     const bowlCentreX = x + w * 0.44;
     const bowlCentreY = y + h * 0.67;
     const bH = h * 0.30;
     push();
-    noStroke();
-    fill(255, 218, 128, 255 * alpha);
+    // A light outline gives the number contrast against the dark oil cavity
+    // without introducing a separate visual element around the lamp.
+    const isLit = this.state === "lit";
+    const jewelPalette = [
+      [255, 126, 43],  // saffron
+      [116, 220, 132], // emerald
+      [108, 188, 255], // sapphire
+      [214, 145, 255], // amethyst
+    ];
+    // A lamp keeps its assigned jewel colour after lighting; the day number
+    // picks the colour, so the effect is consistent across revisits.
+    const [jr, jg, jb] = jewelPalette[(this.id - 1) % jewelPalette.length];
+
+    stroke(isLit ? jr * 0.30 : 58, isLit ? jg * 0.22 : 26, isLit ? jb * 0.18 : 8, 220 * alpha);
+    strokeWeight(Math.max(1, bH * 0.075));
+    fill(isLit ? jr : 255, isLit ? jg : 239, isLit ? jb : 191, 255 * alpha);
     textAlign(CENTER, CENTER);
     textStyle(BOLD);
-    textFont("Georgia");
-    textSize(bH * 0.58);   // fits comfortably in the shallow cavity
+    textFont("Cinzel, Georgia, serif");
+    textSize(this.id >= 10 ? bH * 0.58 : bH * 0.68);
     text(this.id, bowlCentreX, bowlCentreY);
     pop();
   }

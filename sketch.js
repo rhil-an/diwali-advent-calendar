@@ -28,14 +28,14 @@ let isAnimating = false;
 let scrollBanner    = null;
 let scrollBannerImg = null;
 
-// Mandala — 3 concentric layers that bloom into view as each ring of
-// diyas is completed (ring 1 = outer/10, ring 2 = middle/4, ring 3 = center/1)
+// Mandala layers and prototype geometry are driven by the calendar config.
 let mandalaImages = {};
-const MANDALA_RING_COUNT = 3;
+let MANDALA_RING_COUNT = 3;
 let ringDiyas   = { 1: [], 2: [], 3: [] };
 let ringAlpha   = { 1: 0, 2: 0, 3: 0 };
 let ringBurst   = { 1: 0, 2: 0, 3: 0 };
 let ringWasDone = { 1: false, 2: false, 3: false };
+let prototypeMandala = null;
 
 // Mandala geometry — set from config in hydrateDiyas()
 let MANDALA_CX = 0.5;
@@ -51,11 +51,11 @@ const RING_BURST_LEN  = 45;
 // Video overlay — singleton custom player
 // Maps each video-day number to its source file placeholder.
 const VIDEO_DAYS = {
-  3:  "assets/videos/day3.mp4",
-  6:  "assets/videos/day6.mp4",
-  11: "assets/videos/day11.mp4",
-  13: "assets/videos/day13.mp4",
-  15: "assets/videos/day15.mp4",
+  3:  "assets/videos/bonus/rangoli-showcase.mp4",
+  6:  "assets/videos/bonus/floating-diya.mp4",
+  7:  "assets/videos/bonus/sparkler-play.mp4",
+  12: "assets/videos/bonus/lantern-breeze.mp4",
+  16: "assets/videos/bonus/ganesha-blessing.mp4",
 };
 
 // Non-null while the player is visible (read by isOverlayOpen).
@@ -69,6 +69,7 @@ let videoPlayerEl        = null;   // the <video> element itself
 // Text/reveal card
 let revealCardEl = null;
 let dimOverlayEl = null;
+let storyCardKeyboardReady = false;
 
 // Spring popup — jack-in-the-box image reveal for targeted days.
 //
@@ -98,8 +99,8 @@ const SPRING_POPUP_DAYS = {
   // Day 10 — Diwali Around the World → diwali sweets as a gifting symbol
   10: "assets/lamp-items/diwali-sweets.png",
 
-  // Day 14 — Govardhan Puja     → festive sparkler
-  14: "assets/lamp-items/festivesparkler.png",
+  // Day 20 — Govardhan Puja     → festive sparkler
+  20: "assets/lamp-items/festivesparkler.png",
 };
 let springPopupEl    = null;
 let springPopupTimer = null;
@@ -121,11 +122,17 @@ let canvasScale = 1;
 ----------------------------------------------------------- */
 
 let currentUnlockedDay = 1;
+
+// Temporary testing mode: every lamp can be opened directly, regardless of
+// the calendar's normal day-by-day unlock order.
+const SEQUENTIAL_UNLOCK_ENABLED = false;
 let moonContainerEl    = null;
 let moonShadowEl       = null;
 
-// Progress badge — small "X / 15" readout, kept in sync with currentUnlockedDay.
-const TOTAL_DAYS      = 15;
+// Progress is read from the current calendar configuration.
+let totalDays          = 15;
+let festivalStartDay   = 11;
+let mainDiwaliDay      = 13;
 let progressBadgeEl   = null;
 
 // Illumination % per calendar day (from lunar-cycle CSV mapping)
@@ -170,18 +177,24 @@ function setup() {
    reusing the preloaded response. It also lets normal HTTP caching speed
    up repeat visits, which a per-load "?v=timestamp" would otherwise defeat. ── */
 async function loadCoreAssets() {
-  const [bgImg, bannerImg, outerImg, middleImg, centerImg] = await Promise.all([
+  const prototypeLayers = diyaConfig?.prototypeMandala?.layers || [];
+  const assets = await Promise.all([
     loadImageCompat("images/diwali-background.png"),
     loadImageCompat("assets/banner/title-banner.png"),
     loadImageCompat("assets/mandala/mandala-outer.png"),
     loadImageCompat("assets/mandala/mandala-middle.png"),
     loadImageCompat("assets/mandala/mandala-center.png"),
+    ...prototypeLayers.map((layer) => loadImageCompat(layer.path)),
   ]);
+  const [bgImg, bannerImg, outerImg, middleImg, centerImg] = assets;
   bg               = bgImg;
   scrollBannerImg  = bannerImg;
   mandalaImages.outer  = outerImg;
   mandalaImages.middle = middleImg;
   mandalaImages.center = centerImg;
+  prototypeLayers.forEach((layer, index) => {
+    mandalaImages[layer.key] = assets[index + 5];
+  });
 
   flameFrames = await Promise.all(
     Array.from({ length: 8 }, (_, i) => {
@@ -302,7 +315,7 @@ function draw() {
 
   for (let d of diyas) {
     d.update();
-    const sequentiallyLocked = d.state === "unlit" && d.id > currentUnlockedDay;
+    const sequentiallyLocked = SEQUENTIAL_UNLOCK_ENABLED && d.state === "unlit" && d.id > currentUnlockedDay;
     d.draw({ locked: sequentiallyLocked });
   }
 }
@@ -346,12 +359,15 @@ function updateMoonPhase(day) {
   if (!moonShadowEl) moonShadowEl = document.getElementById("moon-shadow");
   if (!moonShadowEl) return;
 
-  const clamped = Math.max(1, Math.min(15, day | 0));
-  const illum   = MOON_ILLUMINATION[clamped] ?? 0;
+  const clamped = Math.max(1, Math.min(totalDays, day | 0));
+  const distanceFromNewMoon = Math.abs(clamped - mainDiwaliDay);
+  const illum = totalDays === 15
+    ? (MOON_ILLUMINATION[clamped] ?? 0)
+    : Math.min(100, Math.round((distanceFromNewMoon / (mainDiwaliDay - 1)) * 100));
 
   // Positive X = waning (lit on the left as shadow slides right).
   // Negative X = waxing after new moon (crescent grows on the opposite side).
-  const tx = clamped >= 14 ? -illum : illum;
+  const tx = clamped > mainDiwaliDay ? -illum : illum;
   moonShadowEl.style.transform = `translateX(${tx}%)`;
 }
 
@@ -375,8 +391,8 @@ function initProgressBadge() {
 
 function updateProgressBadge() {
   if (!progressBadgeEl) return;
-  const unlocked = Math.min(Math.max(currentUnlockedDay - 1, 0), TOTAL_DAYS);
-  progressBadgeEl.textContent = `${unlocked} / ${TOTAL_DAYS}`;
+  const unlocked = Math.min(Math.max(currentUnlockedDay - 1, 0), totalDays);
+  progressBadgeEl.textContent = unlocked + " / " + totalDays;
 }
 
 function syncMoonPosition() {
@@ -524,6 +540,10 @@ function updateMandalaReveal() {
 }
 
 function drawMandalaLayers() {
+  if (prototypeMandala) {
+    drawPrototypeMandala();
+    return;
+  }
   if (!mandalaImages.outer) return;
 
   push();
@@ -552,6 +572,64 @@ function drawMandalaLayers() {
   }
 
   ctx.restore();
+  pop();
+}
+
+// Asset-free visual exploration for the 21-day format. Guides stay visible
+// from the first frame; each ring grows warmer as its lamps are completed.
+function drawPrototypeMandala() {
+  const layout = diyaConfig?.radialLayout;
+  if (!layout?.rings) return;
+
+  const cx = (layout.cx ?? 0.5) * width;
+  const cy = (layout.cy ?? 0.62) * height;
+  const layers = prototypeMandala?.layers || [];
+  const hasLayerAssets = layers.some((layer) => mandalaImages[layer.key]);
+
+  if (hasLayerAssets) {
+    push();
+    imageMode(CENTER);
+    for (const layer of layers) {
+      const img = mandalaImages[layer.key];
+      if (!img) continue;
+      const reveal = ringAlpha[layer.ring] || 0;
+      const alpha = Math.min(0.92, (layer.baseAlpha ?? 0.2) + reveal * 0.62);
+      tint(255, alpha * 255);
+      const size = width * (layer.size ?? 0.5);
+      image(img, cx, cy, size, size);
+    }
+    noTint();
+    pop();
+    return;
+  }
+
+  const aspect = width / height;
+
+  const color = prototypeMandala.guideColor || [244, 183, 67];
+
+  push();
+  noFill();
+  strokeWeight(Math.max(1.2, width * 0.003));
+  for (const cfg of layout.rings) {
+    const ring = cfg.ring;
+    const radius = (cfg.radius ?? 0.2) * width;
+    const alpha = ringAlpha[ring] || 0;
+    const burst = (ringBurst[ring] || 0) / RING_BURST_LEN;
+    const count = cfg.ids?.length || 1;
+
+    stroke(color[0], color[1], color[2], 44 + alpha * 160);
+    ellipse(cx, cy, radius * 2, radius * 2);
+    for (let i = 0; i < count; i++) {
+      const angle = ((cfg.angleOffsetDeg ?? -90) * Math.PI) / 180 + (TWO_PI / count) * i;
+      const x = cx + radius * Math.cos(angle);
+      const y = cy + radius * Math.sin(angle);
+      const petalSize = width * (0.046 + burst * 0.012);
+      ellipse(x, y, petalSize, petalSize * aspect);
+    }
+  }
+  const centreRadius = width * 0.052;
+  stroke(255, 211, 92, 90 + (ringAlpha[4] || 0) * 165);
+  ellipse(cx, cy, centreRadius * 2, centreRadius * 2);
   pop();
 }
 
@@ -609,7 +687,7 @@ function mousePressed(event) {
 }
 
 function isOverlayOpen() {
-  return Boolean(revealCardEl || videoOverlayWrapper);
+  return Boolean(revealCardEl || springPopupEl || videoOverlayWrapper);
 }
 
 /* ── Global state lock helpers ──
@@ -627,16 +705,33 @@ function setAnimationLock(active) {
 /* ── Shared dispatcher for "what should open after this lamp lights/flares" —
    used by both the first-ignite and re-click paths in handleDiyaInteraction()
    below, so the type→popup mapping only lives in one place. ── */
-function openDiyaContent(d, result, isSpringDay) {
-  if (isSpringDay) {
-    showSpringPopup(d);
-  } else if (result?.type === "video") {
-    playVideo(result.src, d);
-  } else if (result?.type === "text") {
-    showRevealCard(d);
-  } else if (result?.type === "image") {
-    d.replayImageContent();
+function getLampExperience(diya, result) {
+  if (diya.experience) return diya.experience;
+  if (result?.type === "video") return { type: "bonus-video", media: { kind: "video", src: result.src } };
+  if (result?.type === "image") return { type: "popup-image", media: { kind: "image", src: result.src } };
+  return { type: "info-card", media: diya.cardImage ? { kind: "image", src: diya.cardImage } : null };
+}
+
+function openDiyaContent(d, result) {
+  const experience = getLampExperience(d, result);
+  if (experience.type === "bonus-video") {
+    playVideo(experience.media?.src);
+    return;
   }
+  if (experience.type === "popup-image") {
+    showSpringPopup(d, experience.media?.src);
+    return;
+  }
+  if (experience.type === "info-card" || experience.type === "event-card") {
+    showInfoCard(d, experience);
+    return;
+  }
+  showInfoCard(d, {
+    type: "info-card",
+    title: d.theme,
+    description: d.description,
+    media: d.cardImage ? { kind: "image", src: d.cardImage } : null
+  });
 }
 
 function handleDiyaInteraction(d) {
@@ -644,12 +739,9 @@ function handleDiyaInteraction(d) {
   // still playing, so a fast second click can never interrupt/overlap it.
   if (isAnimating) return;
 
-  const isSpringDay = Boolean(SPRING_POPUP_DAYS[d.id]);
-
   if (d.state === "unlit") {
-    // Sequential unlock: only the current day (and any earlier unlit days) may open.
-    // Days ahead of currentUnlockedDay shake and stay locked.
-    if (d.id > currentUnlockedDay) {
+    // In normal calendar mode, days ahead of the current unlock point stay locked.
+    if (SEQUENTIAL_UNLOCK_ENABLED && d.id > currentUnlockedDay) {
       d.triggerLocked(); // canvas shake + locked sound
       return;
     }
@@ -660,8 +752,8 @@ function handleDiyaInteraction(d) {
     const result = d.light();
 
     if (d.id === currentUnlockedDay) {
-      currentUnlockedDay = Math.min(currentUnlockedDay + 1, 16);
-      updateMoonPhase(Math.min(currentUnlockedDay, 15));
+      currentUnlockedDay = Math.min(currentUnlockedDay + 1, totalDays + 1);
+      updateMoonPhase(Math.min(currentUnlockedDay, totalDays));
       updateProgressBadge();
     }
 
@@ -671,7 +763,7 @@ function handleDiyaInteraction(d) {
     // lock first, then open whatever popup/video/card this lamp triggers.
     d.onLit = () => {
       setAnimationLock(false);
-      openDiyaContent(d, result, isSpringDay);
+      openDiyaContent(d, result);
     };
     return;
   }
@@ -689,7 +781,7 @@ function handleDiyaInteraction(d) {
     setTimeout(() => {
       teardownFlameFlare();
       setAnimationLock(false);
-      openDiyaContent(d, d.reopen(), isSpringDay);
+      openDiyaContent(d, d.reopen());
     }, FLAME_FLARE_MS);
 
     return;
@@ -700,9 +792,25 @@ function handleDiyaInteraction(d) {
    Text / cultural reveal card (DOM overlay)
 ----------------------------------------------------------- */
 
-function showRevealCard(diya) {
+function getStoryEpisode(experience, diyaId) {
+  const chapters = Object.entries(window.DIWALI_EXPERIENCES || {})
+    .filter(([, item]) => item.type === "story-video" || item.type === "story-card")
+    .map(([day]) => Number(day))
+    .sort((a, b) => a - b);
+  const index = chapters.indexOf(diyaId);
+  return index === -1 ? null : { number: index + 1, total: chapters.length };
+}
+
+function getCardMeta(exp, diya) {
+  const chapter = getStoryEpisode(exp, diya.id);
+  if (chapter) return { label: "The diya's journey", badge: `Chapter ${chapter.number} of ${chapter.total}` };
+  if (exp.type === "bonus-video") return { label: "Festival interlude", badge: `Calendar day ${diya.id}` };
+  if (exp.type === "event-card") return { label: "Diwali festival day", badge: `Calendar day ${diya.id}` };
+  return { label: "Discover Diwali", badge: `Calendar day ${diya.id}` };
+}
+
+function showRevealCard(diya, result = null, experience = null) {
   teardownRevealCard();
-  teardownVideoOverlay();
 
   const container = document.getElementById("canvas-container");
 
@@ -720,32 +828,72 @@ function showRevealCard(diya) {
   revealCardEl.setAttribute("aria-modal", "true");
   revealCardEl.setAttribute("aria-label", diya.theme);
 
-  const daysUntil = 11 - diya.id;
-  const phase = diya.id >= 11
-    ? `Day ${diya.id - 10} of Diwali`
-    : daysUntil === 1
-      ? "1 day until Diwali"
-      : `${daysUntil} days until Diwali`;
-
-  const hasImage = Boolean(diya.cardImage);
+  const exp = experience || getLampExperience(diya, result);
+  const media = exp.media || null;
+  const isVideo = media?.kind === "video" && media.available !== false;
+  const imageSrc = !isVideo ? (media?.kind === "image" ? media.src : media?.poster || diya.cardImage) : null;
+  const hasImage = Boolean(imageSrc);
+  const isComingSoon = media?.kind === "video" && media.available === false;
+  const story = exp.story || diya.story || diya.description;
+  const fact = exp.fact || (diya.story ? diya.description : "");
+  const hasStoryAndNote = Boolean(story && fact && story !== fact);
+  const chapter = getStoryEpisode(exp, diya.id);
+  const meta = getCardMeta(exp, diya);
+  const title = exp.title || (chapter ? "The Diya's Journey" : diya.theme);
+  const revealAfterPlayback = isVideo || isComingSoon;
   if (hasImage) revealCardEl.classList.add("has-image", "image-loading");
+  if (isVideo) revealCardEl.classList.add("has-video");
+  if (revealAfterPlayback) revealCardEl.classList.add("video-first", "story-details-hidden");
+  if (exp.type === "bonus-video") revealCardEl.classList.add("is-bonus-video");
 
   revealCardEl.innerHTML = `
     <div class="card-header">
       <button class="reveal-card-close" aria-label="Close">×</button>
+      ${isVideo ? `<video class="story-card-video" controls playsinline preload="metadata" aria-label="${title} video"><source src="${media.src}" type="video/mp4"></video>` : ""}
       ${hasImage ? '<div class="card-image-photo" role="img" aria-label="' + diya.theme + '"></div><div class="card-image-scrim"></div>' : ""}
       <div class="card-header-info">
-        <span class="card-badge">${diya.emoji} ${phase}</span>
-        <div class="card-title">${diya.theme}</div>
+        <span class="card-experience-label">${meta.label}</span>
+        <span class="card-badge">${diya.emoji} ${meta.badge}</span>
+        <div class="card-title">${title}</div>
         <div class="card-divider"></div>
       </div>
     </div>
     <div class="card-body-wrap">
-      <div class="card-body">${diya.description}</div>
+      <div class="card-body">
+        ${isVideo ? '<p class="video-stage-copy">Watch the film to unlock this reflection.</p>' : ""}
+        ${isVideo ? '<button class="story-skip" type="button">Read the reflection now</button>' : ""}
+        <p class="story-copy">${story}</p>
+        ${isComingSoon ? '<p class="story-video-placeholder">This chapter is being filmed.</p><button class="story-skip" type="button">Read the chapter</button>' : ""}
+        ${isVideo ? '<button class="story-replay" type="button">Replay story</button>' : ""}
+        ${hasStoryAndNote ? `<details class="tradition-note"><summary>About this tradition</summary><p>${fact}</p></details>` : ""}
+        <button class="story-card-done" type="button">Continue the countdown</button>
+      </div>
     </div>
   `;
 
   revealCardEl.querySelector(".reveal-card-close").addEventListener("click", teardownRevealCard);
+  revealCardEl.querySelector(".story-card-done").addEventListener("click", teardownRevealCard);
+
+  const storyVideo = revealCardEl.querySelector(".story-card-video");
+  const revealDetails = () => {
+    revealCardEl?.classList.remove("story-details-hidden");
+    storyVideo?.classList.add("has-finished");
+  };
+  revealCardEl.querySelectorAll(".story-skip").forEach((button) => {
+    button.addEventListener("click", revealDetails);
+  });
+  if (storyVideo) {
+    storyVideo.addEventListener("loadedmetadata", () => {
+      if (storyVideo.videoHeight > storyVideo.videoWidth) {
+        revealCardEl?.classList.add("has-portrait-video");
+      }
+    }, { once: true });
+    storyVideo.addEventListener("ended", revealDetails, { once: true });
+    revealCardEl.querySelector(".story-replay").addEventListener("click", () => {
+      storyVideo.currentTime = 0;
+      storyVideo.play().catch(() => {});
+    });
+  }
 
   container.appendChild(dimOverlayEl);
   // Card lives inside the overlay so the overlay's flexbox centers it.
@@ -756,7 +904,7 @@ function showRevealCard(diya) {
     preload.onload = () => {
       const photoEl = revealCardEl && revealCardEl.querySelector(".card-image-photo");
       if (!photoEl) return;
-      photoEl.style.backgroundImage = `url("${diya.cardImage}")`;
+      photoEl.style.backgroundImage = `url("${imageSrc}")`;
       revealCardEl.classList.remove("image-loading");
     };
     preload.onerror = () => {
@@ -765,11 +913,78 @@ function showRevealCard(diya) {
       revealCardEl.querySelector(".card-image-photo")?.remove();
       revealCardEl.querySelector(".card-image-scrim")?.remove();
     };
-    preload.src = diya.cardImage;
+    preload.src = imageSrc;
+  }
+
+  if (!storyCardKeyboardReady) {
+    storyCardKeyboardReady = true;
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && revealCardEl) teardownRevealCard();
+    });
+  }
+}
+
+/* Simple information/event card: background image, title, and one clear
+   description. It intentionally has none of the story controls or sections. */
+function showInfoCard(diya, experience) {
+  teardownRevealCard();
+
+  const container = document.getElementById("canvas-container");
+  const imageSrc = experience.media?.kind === "image" ? experience.media.src : null;
+  const description = experience.description || experience.fact || experience.story || diya.description;
+  const label = experience.type === "event-card" ? "Diwali festival day" : "Diwali guide";
+
+  dimOverlayEl = document.createElement("div");
+  dimOverlayEl.className = "dim-overlay";
+  dimOverlayEl.addEventListener("click", (e) => {
+    if (e.target === dimOverlayEl) teardownRevealCard();
+  });
+
+  revealCardEl = document.createElement("div");
+  revealCardEl.className = "reveal-card info-card";
+  if (imageSrc) revealCardEl.classList.add("has-image", "image-loading");
+  else revealCardEl.classList.add("has-placeholder");
+  revealCardEl.setAttribute("role", "dialog");
+  revealCardEl.setAttribute("aria-modal", "true");
+  revealCardEl.setAttribute("aria-label", experience.title || diya.theme);
+  revealCardEl.innerHTML = `
+    <div class="card-header">
+      <button class="reveal-card-close" aria-label="Close">×</button>
+      ${imageSrc ? '<div class="card-image-photo" role="img" aria-label="' + (experience.title || diya.theme) + '"></div><div class="card-image-scrim"></div>' : '<div class="info-card-placeholder">✦</div>'}
+      <div class="card-header-info">
+        <span class="card-experience-label">${label}</span>
+        <div class="card-title">${experience.title || diya.theme}</div>
+        <div class="card-divider"></div>
+      </div>
+    </div>
+    <div class="card-body-wrap"><div class="card-body"><p class="story-copy">${description}</p></div></div>
+  `;
+  revealCardEl.querySelector(".reveal-card-close").addEventListener("click", teardownRevealCard);
+  container.appendChild(dimOverlayEl);
+  dimOverlayEl.appendChild(revealCardEl);
+
+  if (imageSrc) {
+    const preload = new Image();
+    preload.onload = () => {
+      const photoEl = revealCardEl?.querySelector(".card-image-photo");
+      if (!photoEl) return;
+      photoEl.style.backgroundImage = `url("${imageSrc}")`;
+      revealCardEl.classList.remove("image-loading");
+    };
+    preload.onerror = () => {
+      if (!revealCardEl) return;
+      revealCardEl.classList.remove("has-image", "image-loading");
+      revealCardEl.classList.add("has-placeholder");
+      revealCardEl.querySelector(".card-image-photo")?.replaceWith(Object.assign(document.createElement("div"), { className: "info-card-placeholder", textContent: "✦" }));
+      revealCardEl.querySelector(".card-image-scrim")?.remove();
+    };
+    preload.src = imageSrc;
   }
 }
 
 function teardownRevealCard() {
+  const video = revealCardEl?.querySelector("video");
+  if (video) { video.pause(); video.removeAttribute("src"); video.load(); }
   if (revealCardEl) { revealCardEl.remove(); revealCardEl = null; }
   if (dimOverlayEl) { dimOverlayEl.remove(); dimOverlayEl = null; }
 }
@@ -778,11 +993,11 @@ function teardownRevealCard() {
    Spring popup — jack-in-the-box image reveal
 ----------------------------------------------------------- */
 
-function showSpringPopup(diya) {
-  if (!SPRING_POPUP_DAYS[diya.id]) return;
+function showSpringPopup(diya, imageSrc) {
+  if (!imageSrc) return;
   teardownSpringPopup();
 
-  const imgSrc     = SPRING_POPUP_DAYS[diya.id];
+  const imgSrc     = imageSrc;
   const canvasRect = canvasEl.elt.getBoundingClientRect();
 
   // Explicit scale: p5 logical coordinates → actual rendered viewport pixels.
@@ -819,6 +1034,13 @@ function showSpringPopup(diya) {
   img.src = imgSrc;
   img.alt = `Day ${diya.id} surprise`;
   springPopupEl.appendChild(img);
+
+  if (diya.experience?.foundLabel) {
+    const foundLabel = document.createElement("div");
+    foundLabel.className = "popup-found-label";
+    foundLabel.textContent = diya.experience.foundLabel;
+    springPopupEl.appendChild(foundLabel);
+  }
 
   // Append to body so position:fixed coordinates are always in viewport space,
   // unaffected by any transforms on ancestor elements.
@@ -916,9 +1138,16 @@ function initVideoPlayer() {
   videoPlayerEl.controls    = true;
   videoPlayerEl.playsInline = true;
   videoPlayerEl.autoplay    = true;
-  videoPlayerEl.onended     = exitVideo;
+  videoPlayerEl.muted       = true;
+  videoPlayerEl.onended = () => {
+    videoPlayerHint.textContent = "Video finished — drag the progress bar or press play to watch again.";
+    videoPlayerHint.hidden = false;
+  };
 
   // ── Close ("X") button — top-right corner, always visible ──
+  // Restore the original player lifecycle: it closes when the video ends.
+  videoPlayerEl.onended = exitVideo;
+  videoPlayerEl.muted = false;
   const closeBtn = document.createElement("button");
   closeBtn.className = "video-modal-close";
   closeBtn.setAttribute("aria-label", "Close video");
@@ -941,7 +1170,17 @@ function initVideoPlayer() {
     else if (springPopupEl)    dismissSpringPopup();
   });
 
+  videoPlayerHint = document.createElement("p");
+  videoPlayerHint.className = "video-player-hint";
+  videoPlayerHint.textContent = "Playing muted — use the player controls to turn on sound.";
+
+  videoPlayerEl.addEventListener("error", () => {
+    videoPlayerHint.textContent = "This video could not load. Please check the MP4 file and try again.";
+    videoPlayerHint.hidden = false;
+  });
+
   videoPlayerContainer.appendChild(videoPlayerEl);
+  videoPlayerContainer.appendChild(videoPlayerHint);
   videoPlayerContainer.appendChild(closeBtn);
   document.body.appendChild(videoPlayerContainer);
 }
@@ -963,6 +1202,13 @@ function playVideo(src) {
   teardownSpringPopup();   // dismiss any active 3D popup so it can't overlap the video
   initVideoPlayer();
 
+  videoPlayerEl.muted = true;
+  videoPlayerHint.textContent = "Playing muted — use the player controls to turn on sound.";
+  videoPlayerHint.hidden = false;
+  videoPlayerEl.preload = "auto";
+  videoPlayerEl.muted = false;
+  videoPlayerHint.hidden = true;
+  videoPlayerEl.preload = "none";
   videoPlayerEl.src = src;
   videoPlayerEl.load();
   videoPlayerContainer.style.display = "flex";
@@ -984,7 +1230,7 @@ function teardownVideoOverlay() {
    each Diya's x/y to sit on the mandala petals via polar coordinates.
    Layout layers are keyed by day ID (not unlock order): outer 1–10,
    middle 11/12/14/15, center 13. Chronological unlock (currentUnlockedDay)
-   is unchanged. Outer/middle lamps get a small random "petal jitter";
+   is unchanged. Ring lamps get a small seeded "petal jitter";
    the centre lamp does not. The lamp's w/h from `pos` are always preserved.
 
    Geometry notes
@@ -994,9 +1240,22 @@ function teardownVideoOverlay() {
                     both x and y by scaling the y component by (width/height)
                     so the ring is a true circle in pixel space, not an ellipse.
    • angleOffset  — 0° = 3 o'clock, -90° = 12 o'clock (top of canvas).
-   • jitterPx     — independent random pixel nudge on each axis, converted
-                    to the matching fraction so it scales with the canvas.
+   • jitterPx     — maximum stable pixel nudge on each axis, converted to
+                    the matching fraction so it scales with the canvas.
+   • positionSeed — changing this number creates one new, repeatable layout.
 ----------------------------------------------------------- */
+
+// Produces the same 0–1 value for a given seed/key pair. This deliberately
+// avoids Math.random(), so a reload (or canvas resize) never rearranges lamps.
+function seededLayoutUnit(seed, key) {
+  let value = (Number(seed) || 1) >>> 0;
+  const text = String(key);
+  for (let i = 0; i < text.length; i++) {
+    value = Math.imul(value ^ text.charCodeAt(i), 0x45d9f3b) >>> 0;
+    value ^= value >>> 16;
+  }
+  return (value >>> 0) / 0x100000000;
+}
 
 function computeRadialPositions(rl, diyasList) {
   const radCX = rl.cx ?? MANDALA_CX;
@@ -1005,6 +1264,10 @@ function computeRadialPositions(rl, diyasList) {
   const outerCfg  = rl.outer  || {};
   const middleCfg = rl.middle || {};
   const jitterPx  = rl.jitterPx ?? 20;
+  const positionSeed = rl.positionSeed ?? 20260731;
+
+  const stableJitter = (id, axisSize, axis) =>
+    (seededLayoutUnit(positionSeed, `${id}-${axis}`) * 2 - 1) * (jitterPx / axisSize);
 
   const outerRadius     = outerCfg.radius          ?? 0.32;
   const outerOffsetRad  = ((outerCfg.angleOffsetDeg  ?? -90) * Math.PI) / 180;
@@ -1020,6 +1283,32 @@ function computeRadialPositions(rl, diyasList) {
 
   const byId = Object.fromEntries(diyasList.map((d) => [d.id, d]));
 
+  // New layouts declare their rings explicitly, making the placement scale to
+  // any number of days without changing this engine again.
+  if (Array.isArray(rl.rings)) {
+    const ringAspect = width / height;
+    for (const ring of rl.rings) {
+      const ids = ring.ids || [];
+      const radius = ring.radius ?? 0.2;
+      const offset = ((ring.angleOffsetDeg ?? -90) * Math.PI) / 180;
+      ids.forEach((id, i) => {
+        const d = byId[id];
+        if (!d) return;
+        const angle = offset + (TWO_PI / ids.length) * i;
+        const jx = stableJitter(id, width, "x");
+        const jy = stableJitter(id, height, "y");
+        d.x = radCX + radius * Math.cos(angle) - d.w / 2 + jx;
+        d.y = radCY + radius * ringAspect * Math.sin(angle) - d.h / 2 + jy;
+      });
+    }
+    const center = byId[rl.centerId];
+    if (center) {
+      center.x = radCX - center.w / 2;
+      center.y = radCY - center.h / 2;
+    }
+    return;
+  }
+
   // The radius is expressed as a fraction of canvas WIDTH. To keep the ring
   // circular in pixel space on a non-square canvas, scale the y-component by
   // (width / height) so that one unit of radius = the same number of pixels
@@ -1031,8 +1320,8 @@ function computeRadialPositions(rl, diyasList) {
     const d = byId[id];
     if (!d) return;
     const angle = outerOffsetRad + (TWO_PI / outerLamps.length) * i;
-    const jx    = (Math.random() * 2 - 1) * (jitterPx / width);
-    const jy    = (Math.random() * 2 - 1) * (jitterPx / height);
+    const jx    = stableJitter(id, width, "x");
+    const jy    = stableJitter(id, height, "y");
     // Centre of the petal → then shift by -w/2, -h/2 to get the top-left corner
     d.x = radCX + outerRadius          * Math.cos(angle) - d.w / 2 + jx;
     d.y = radCY + outerRadius * aspect * Math.sin(angle) - d.h / 2 + jy;
@@ -1043,8 +1332,8 @@ function computeRadialPositions(rl, diyasList) {
     const d = byId[id];
     if (!d) return;
     const angle = middleOffsetRad + (TWO_PI / middleLamps.length) * i;
-    const jx    = (Math.random() * 2 - 1) * (jitterPx / width);
-    const jy    = (Math.random() * 2 - 1) * (jitterPx / height);
+    const jx    = stableJitter(id, width, "x");
+    const jy    = stableJitter(id, height, "y");
     d.x = radCX + middleRadius          * Math.cos(angle) - d.w / 2 + jx;
     d.y = radCY + middleRadius * aspect * Math.sin(angle) - d.h / 2 + jy;
   });
@@ -1068,6 +1357,21 @@ function hydrateDiyas(data) {
   }
 
   creditsConfig = data.credits || null;
+  totalDays = data.diyas.length;
+  festivalStartDay = Number(data.festivalStartDay) || Math.max(1, totalDays - 4);
+  mainDiwaliDay = Number(data.mainDiwaliDay) || festivalStartDay + 2;
+  prototypeMandala = data.prototypeMandala || null;
+  MANDALA_RING_COUNT = Math.max(...data.diyas.map((d) => Number(d.ring) || 1));
+  ringDiyas = {};
+  ringAlpha = {};
+  ringBurst = {};
+  ringWasDone = {};
+  for (let ring = 1; ring <= MANDALA_RING_COUNT; ring++) {
+    ringDiyas[ring] = [];
+    ringAlpha[ring] = 0;
+    ringBurst[ring] = 0;
+    ringWasDone[ring] = false;
+  }
 
   // Read mandala geometry from flat config block
   const m = data.mandala || {};
@@ -1107,7 +1411,6 @@ function hydrateDiyas(data) {
     }
   }
 
-  ringDiyas = { 1: [], 2: [], 3: [] };
   for (const d of diyas) {
     if (!ringDiyas[d.ring]) ringDiyas[d.ring] = [];
     ringDiyas[d.ring].push(d);
