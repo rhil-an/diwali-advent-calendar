@@ -51,10 +51,11 @@ const RING_BURST_LEN  = 45;
 // Video overlay — singleton custom player
 // Maps each video-day number to its source file placeholder.
 const VIDEO_DAYS = {
+  1:  "assets/videos/card-stories/day-01-rows-of-diyas.mp4",
   3:  "assets/videos/bonus/rangoli-showcase.mp4",
-  6:  "assets/videos/bonus/floating-diya.mp4",
   7:  "assets/videos/bonus/sparkler-play.mp4",
   12: "assets/videos/bonus/lantern-breeze.mp4",
+  15: "assets/videos/bonus/floating-diya.mp4",
   16: "assets/videos/bonus/ganesha-blessing.mp4",
 };
 
@@ -179,7 +180,7 @@ function setup() {
 async function loadCoreAssets() {
   const prototypeLayers = diyaConfig?.prototypeMandala?.layers || [];
   const assets = await Promise.all([
-    loadImageCompat("images/diwali-background.png"),
+    loadImageCompat("assets/images/backgrounds/diwali-background.png"),
     loadImageCompat("assets/banner/title-banner.png"),
     loadImageCompat("assets/mandala/mandala-outer.png"),
     loadImageCompat("assets/mandala/mandala-middle.png"),
@@ -214,7 +215,7 @@ async function loadCoreAssets() {
 /* ── Runs once loadCoreAssets() has resolved — the old body of setup(). ── */
 function finishSetup() {
   if (!bg) {
-    console.error("Diwali background image failed to load — check images/diwali-background.png.");
+    console.error("Diwali background image failed to load — check assets/images/backgrounds/diwali-background.png.");
     return;
   }
 
@@ -924,15 +925,351 @@ function showRevealCard(diya, result = null, experience = null) {
   }
 }
 
+const EASTER_EGG_SPRITES = {
+  kalash: "assets/images/easter-eggs/sprites/day-17-kalash.png",
+  brassBowl: "assets/images/easter-eggs/sprites/day-17-brass-bowl.png",
+  goldCoin: "assets/images/easter-eggs/sprites/day-17-gold-coin.png",
+  pinkFlower: "assets/images/easter-eggs/sprites/day-18-pink-flower.png",
+  goldSun: "assets/images/easter-eggs/sprites/day-18-gold-sun.png",
+  tealLeaf: "assets/images/easter-eggs/sprites/day-18-teal-leaf.png",
+  violetLotus: "assets/images/easter-eggs/sprites/day-18-violet-lotus.png",
+  rice: "assets/images/easter-eggs/sprites/day-20-rice.png",
+  curry: "assets/images/easter-eggs/sprites/day-20-curry.png",
+  roti: "assets/images/easter-eggs/sprites/day-20-roti.png",
+  mithai: "assets/images/easter-eggs/sprites/day-20-mithai.png",
+  braceletThread: "assets/images/easter-eggs/day21/day-21-thread-spool.png",
+  braceletBead: "assets/images/easter-eggs/day21/day-21-gold-bead.png",
+  braceletCharm: "assets/images/easter-eggs/day21/day-21-lotus-charm.png",
+  braceletTassel: "assets/images/easter-eggs/day21/day-21-red-tassel.png",
+};
+
+function easterSprite(key, alt) {
+  return `<img class="easter-sprite" src="${EASTER_EGG_SPRITES[key]}" alt="${alt}">`;
+}
+
+function getEasterEggMarkup(egg) {
+  const common = (title, instruction, body) => `
+    <div class="easter-game" data-game="${egg.kind}">
+      <button class="reveal-card-close" aria-label="Exit card" title="Exit card">×</button>
+      <span class="easter-game-kicker">Hidden festival moment</span>
+      <h2>${title}</h2>
+      <p class="easter-game-instruction">${instruction}</p>
+      ${body}
+      <p class="easter-game-status" aria-live="polite"></p>
+    </div>`;
+
+  if (egg.kind === "auspicious-tray") return common("Auspicious Finds", "Place each festive find on the tray.", `
+    <div class="easter-tray">${[["kalash", "Kalash"], ["brassBowl", "Brass bowl"], ["goldCoin", "Gold coin"]].map(([item, label]) => `<span class="tray-slot" data-slot="${item}" aria-label="${label} slot"></span>`).join("")}</div>
+    <div class="easter-choice-row">${[["kalash", "Kalash"], ["brassBowl", "Brass bowl"], ["goldCoin", "Gold coin"]].map(([item, label]) => `<button type="button" class="easter-choice image-choice" data-item="${item}" aria-label="Place ${label}">${easterSprite(item, label)}</button>`).join("")}</div>`);
+  if (egg.kind === "rangoli-puzzle") {
+    const rangoliTiles = [["pinkFlower", "Pink flower"], ["goldSun", "Gold sun"], ["tealLeaf", "Teal leaf"], ["violetLotus", "Violet lotus"]];
+    const shuffledTiles = [...rangoliTiles, ...rangoliTiles]
+      .sort(() => Math.random() - 0.5);
+    return common("Rangoli Memory Match", "Turn over two tiles at a time and find all four matching pairs.", `
+      <div class="rangoli-board rangoli-memory-board">${shuffledTiles.map(([sprite, label]) => `<button type="button" class="rangoli-piece memory-tile" data-match="${sprite}" aria-label="Turn over a rangoli tile"><span class="memory-tile-art">${easterSprite(sprite, label)}</span></button>`).join("")}</div>`);
+  }
+  if (egg.kind === "light-ripple") {
+    const diyaImage = '<img src="assets/lamp-items/diyalamp.png" alt="">';
+    const rippleDiyas = [[10, 20, 90], [30, 6, 170], [70, 6, 250], [90, 20, 330], [10, 72, 410], [30, 89, 490], [70, 89, 570], [90, 72, 650]];
+    return common("The Light Ripple", "Light the centre diya and watch its warmth travel through the Diwali night.", `
+      <div class="ripple-courtyard" aria-label="A dark courtyard waiting to be lit">
+        <span class="ripple-halo" aria-hidden="true"></span>
+        ${rippleDiyas.map(([x, y, delay]) => `<span class="ripple-diya" style="--x:${x}%; --y:${y}%; --delay:${delay}ms" aria-hidden="true">${diyaImage}</span>`).join("")}
+        <button type="button" class="ripple-central-diya" aria-label="Light the central diya">${diyaImage}</button>
+      </div>`);
+  }
+  if (egg.kind === "annakut-plate") return common("Build an Annakut Plate", "Add each offering to the festive platter.", `
+    <div class="annakut-plate" aria-label="Offering platter"></div>
+    <div class="easter-choice-row">${[["rice", "Rice"], ["curry", "Curry"], ["roti", "Roti"], ["mithai", "Mithai"]].map(([item, label]) => `<button type="button" class="easter-choice image-choice" data-item="${item}" aria-label="Add ${label}">${easterSprite(item, label)}</button>`).join("")}</div>`);
+  if (egg.kind === "blessing-bracelet") {
+    const braceletPieces = [["braceletThread", "Thread spool"], ["braceletBead", "Gold bead"], ["braceletCharm", "Lotus charm"], ["braceletTassel", "Red tassel"]];
+    return common("Blessing Bracelet", "Place the spool, pull its loose strand to the gold knot, then finish the bracelet in order.", `
+      <div class="bracelet-board" aria-label="Empty blessing bracelet">
+        <span class="bracelet-thread" aria-hidden="true"></span>
+        <span class="bracelet-knot bracelet-knot-left" aria-hidden="true"></span>
+        <span class="bracelet-knot bracelet-knot-right" aria-hidden="true"></span>
+        <span class="bracelet-thread-target" aria-hidden="true"></span>
+        <button type="button" class="bracelet-strand-handle" disabled aria-label="Drag the loose thread end to the gold knot">✦</button>
+        ${braceletPieces.map(([item, label]) => `<span class="bracelet-slot bracelet-slot-${item}" data-slot="${item}" aria-label="${label} position"></span>`).join("")}
+      </div>
+      <div class="easter-choice-row bracelet-choice-row">${braceletPieces.map(([item, label], index) => `<button type="button" class="easter-choice image-choice bracelet-choice" data-item="${item}" aria-label="Add ${label}"${index ? " disabled" : ""}>${easterSprite(item, label)}</button>`).join("")}</div>`);
+  }
+  return common("Tilak Blessing", "Tap the marks from top to bottom.", `
+    <div class="tilak-board">${[2, 3, 1].map((mark) => `<button type="button" class="tilak-mark" data-mark="${mark}" aria-label="Tilak mark">●</button>`).join("")}</div>`);
+}
+
+function makeChoicesDraggable(game, choiceSelector, targetSelector, onDrop) {
+  const target = game.querySelector(targetSelector);
+  if (!target) return;
+  game.querySelectorAll(choiceSelector).forEach((choice) => {
+    let startX = 0;
+    let startY = 0;
+    let dragging = false;
+    let pointerActive = false;
+    choice.addEventListener("pointerdown", (event) => {
+      if (choice.disabled) return;
+      startX = event.clientX;
+      startY = event.clientY;
+      dragging = false;
+      pointerActive = true;
+      choice.setPointerCapture?.(event.pointerId);
+    });
+    choice.addEventListener("pointermove", (event) => {
+      if (!pointerActive || choice.disabled) return;
+      const dx = event.clientX - startX;
+      const dy = event.clientY - startY;
+      if (Math.hypot(dx, dy) < 8) return;
+      dragging = true;
+      choice.classList.add("is-dragging");
+      choice.style.transform = `translate(${dx}px, ${dy}px) scale(1.12)`;
+    });
+    choice.addEventListener("pointerup", (event) => {
+      if (!pointerActive) return;
+      pointerActive = false;
+      choice.releasePointerCapture?.(event.pointerId);
+      choice.classList.remove("is-dragging");
+      choice.style.transform = "";
+      if (!dragging || choice.disabled) return;
+      choice.dataset.suppressClick = "true";
+      const rect = target.getBoundingClientRect();
+      if (event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom) {
+        onDrop(choice);
+      }
+    });
+    choice.addEventListener("pointercancel", () => {
+      pointerActive = false;
+      choice.classList.remove("is-dragging");
+      choice.style.transform = "";
+    });
+  });
+}
+
+function consumeDragClick(button) {
+  if (button.dataset.suppressClick !== "true") return false;
+  delete button.dataset.suppressClick;
+  return true;
+}
+
+function initFestivalEasterEgg(cardEl, egg, onComplete) {
+  const game = cardEl.querySelector(".easter-game");
+  if (!game) return;
+  const status = game.querySelector(".easter-game-status");
+  let completed = false;
+  const complete = (message) => {
+    if (completed) return;
+    completed = true;
+    game.classList.add("is-complete");
+    status.textContent = message;
+    setTimeout(onComplete, 1100);
+  };
+
+  if (egg.kind === "auspicious-tray") {
+    const placeItem = (button) => {
+      if (completed || button.disabled) return;
+      const traySlot = game.querySelector(`.tray-slot[data-slot="${button.dataset.item}"]`);
+      traySlot.innerHTML = button.innerHTML;
+      traySlot.classList.add("is-filled");
+      button.disabled = true;
+      if (game.querySelectorAll(".easter-choice:disabled").length === 3) complete("Auspicious wishes gathered.");
+    };
+    game.querySelectorAll(".easter-choice").forEach((button) => button.addEventListener("click", () => {
+      if (!consumeDragClick(button)) placeItem(button);
+    }));
+    makeChoicesDraggable(game, ".easter-choice", ".easter-tray", placeItem);
+    return;
+  }
+
+  if (egg.kind === "rangoli-puzzle") {
+    let firstTile = null;
+    let resolvingPair = false;
+    let matches = 0;
+    game.querySelectorAll(".rangoli-piece").forEach((button) => button.addEventListener("click", () => {
+      if (completed || resolvingPair || button.classList.contains("is-revealed") || button.classList.contains("is-matched")) return;
+      button.classList.add("is-revealed");
+      button.setAttribute("aria-label", "Rangoli tile revealed");
+      if (!firstTile) {
+        firstTile = button;
+        status.textContent = "Find its matching tile.";
+        return;
+      }
+      if (button.dataset.match === firstTile.dataset.match) {
+        button.classList.add("is-matched");
+        firstTile.classList.add("is-matched");
+        matches += 1;
+        firstTile = null;
+        if (matches === 4) complete("Every rangoli pair is matched.");
+        else status.textContent = `${4 - matches} pair${matches === 3 ? "" : "s"} left.`;
+        return;
+      }
+      const previousTile = firstTile;
+      firstTile = null;
+      resolvingPair = true;
+      status.textContent = "Not a match — remember where they are.";
+      setTimeout(() => {
+        [previousTile, button].forEach((tile) => {
+          tile.classList.remove("is-revealed");
+          tile.setAttribute("aria-label", "Turn over a rangoli tile");
+        });
+        resolvingPair = false;
+      }, 750);
+    }));
+    return;
+  }
+
+  if (egg.kind === "light-ripple") {
+    const courtyard = game.querySelector(".ripple-courtyard");
+    const centralDiya = game.querySelector(".ripple-central-diya");
+    centralDiya.addEventListener("click", () => {
+      if (completed || courtyard.classList.contains("is-rippling")) return;
+      courtyard.classList.add("is-rippling");
+      centralDiya.disabled = true;
+      status.textContent = "The light is travelling outward…";
+      game.querySelectorAll(".ripple-diya").forEach((diya) => {
+        setTimeout(() => diya.classList.add("is-lit"), Number.parseInt(diya.style.getPropertyValue("--delay"), 10));
+      });
+      setTimeout(() => complete("The whole courtyard glows for Diwali."), 900);
+    });
+    return;
+  }
+
+  if (egg.kind === "annakut-plate") {
+    const plate = game.querySelector(".annakut-plate");
+    const addOffering = (button) => {
+      if (completed || button.disabled) return;
+      plate.insertAdjacentHTML("beforeend", `<span>${button.innerHTML}</span>`);
+      button.disabled = true;
+      if (game.querySelectorAll(".easter-choice:disabled").length === 4) complete("Your offering plate is ready.");
+    };
+    game.querySelectorAll(".easter-choice").forEach((button) => button.addEventListener("click", () => {
+      if (!consumeDragClick(button)) addOffering(button);
+    }));
+    makeChoicesDraggable(game, ".easter-choice", ".annakut-plate", addOffering);
+    return;
+  }
+
+  if (egg.kind === "blessing-bracelet") {
+    const assemblyOrder = ["braceletThread", "braceletBead", "braceletCharm", "braceletTassel"];
+    let nextPieceIndex = 0;
+    let strandWoven = false;
+    const braceletBoard = game.querySelector(".bracelet-board");
+    const enablePiece = (item) => {
+      const choice = game.querySelector(`.bracelet-choice[data-item="${item}"]`);
+      if (choice) choice.disabled = false;
+    };
+    const placePiece = (button) => {
+      if (completed || button.disabled) return;
+      if (button.dataset.item !== assemblyOrder[nextPieceIndex]) {
+        status.textContent = "Follow the bracelet order shown on the board.";
+        return;
+      }
+      if (nextPieceIndex === 1 && !strandWoven) {
+        status.textContent = "First pull the loose strand across to the gold knot.";
+        return;
+      }
+      const slot = game.querySelector(`.bracelet-slot[data-slot="${button.dataset.item}"]`);
+      if (!slot) return;
+      slot.innerHTML = button.innerHTML;
+      slot.classList.add("is-filled");
+      button.disabled = true;
+      if (nextPieceIndex === 0) {
+        nextPieceIndex = 1;
+        braceletBoard.classList.add("has-spool");
+        const strandHandle = game.querySelector(".bracelet-strand-handle");
+        strandHandle.disabled = false;
+        status.textContent = "Now drag the loose thread end to the gold knot.";
+        return;
+      }
+      nextPieceIndex += 1;
+      if (nextPieceIndex === assemblyOrder.length) complete("Your Bhai Dooj blessing bracelet is complete.");
+      else {
+        enablePiece(assemblyOrder[nextPieceIndex]);
+        status.textContent = `Now add the ${assemblyOrder[nextPieceIndex] === "braceletCharm" ? "lotus charm" : "red tassel"}.`;
+      }
+    };
+
+    const strandHandle = game.querySelector(".bracelet-strand-handle");
+    const strandTarget = game.querySelector(".bracelet-thread-target");
+    let strandPointerActive = false;
+    let strandStartX = 0;
+    let strandStartY = 0;
+    let strandDragged = false;
+    strandHandle.addEventListener("pointerdown", (event) => {
+      if (strandHandle.disabled || completed || strandWoven) return;
+      strandPointerActive = true;
+      strandDragged = false;
+      strandStartX = event.clientX;
+      strandStartY = event.clientY;
+      strandHandle.setPointerCapture?.(event.pointerId);
+    });
+    strandHandle.addEventListener("pointermove", (event) => {
+      if (!strandPointerActive) return;
+      const dx = event.clientX - strandStartX;
+      const dy = event.clientY - strandStartY;
+      if (Math.hypot(dx, dy) < 8) return;
+      strandDragged = true;
+      strandHandle.classList.add("is-dragging");
+      strandHandle.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(1.12)`;
+    });
+    strandHandle.addEventListener("pointerup", (event) => {
+      if (!strandPointerActive) return;
+      strandPointerActive = false;
+      strandHandle.releasePointerCapture?.(event.pointerId);
+      strandHandle.classList.remove("is-dragging");
+      strandHandle.style.transform = "";
+      if (!strandDragged) return;
+      const targetBounds = strandTarget.getBoundingClientRect();
+      const reachedTarget = event.clientX >= targetBounds.left && event.clientX <= targetBounds.right && event.clientY >= targetBounds.top && event.clientY <= targetBounds.bottom;
+      if (!reachedTarget) {
+        status.textContent = "Pull the glowing thread end onto the gold knot.";
+        return;
+      }
+      strandWoven = true;
+      strandHandle.disabled = true;
+      braceletBoard.classList.add("is-woven");
+      enablePiece("braceletBead");
+      status.textContent = "The thread is woven. Add the gold bead next.";
+    });
+    strandHandle.addEventListener("pointercancel", () => {
+      strandPointerActive = false;
+      strandHandle.classList.remove("is-dragging");
+      strandHandle.style.transform = "";
+    });
+    game.querySelectorAll(".bracelet-choice").forEach((button) => button.addEventListener("click", () => {
+      if (!consumeDragClick(button)) placePiece(button);
+    }));
+    makeChoicesDraggable(game, ".bracelet-choice", ".bracelet-board", placePiece);
+    return;
+  }
+
+  let next = 1;
+  game.querySelectorAll(".tilak-mark").forEach((button) => button.addEventListener("click", () => {
+    if (completed || button.disabled) return;
+    if (Number(button.dataset.mark) === next) {
+      button.disabled = true;
+      button.classList.add("is-placed");
+      next += 1;
+      if (next === 4) complete("A blessing for the year ahead.");
+    } else {
+      status.textContent = "Begin with the top mark.";
+    }
+  }));
+}
+
 /* Simple information/event card: background image, title, and one clear
-   description. It intentionally has none of the story controls or sections. */
+   description. Festival-day cards can also contain a hidden flip-card game. */
 function showInfoCard(diya, experience) {
   teardownRevealCard();
 
   const container = document.getElementById("canvas-container");
   const imageSrc = experience.media?.kind === "image" ? experience.media.src : null;
   const description = experience.description || experience.fact || experience.story || diya.description;
-  const label = experience.type === "event-card" ? "Diwali festival day" : "Diwali guide";
+  const diwaliDayNumber = diya.id - festivalStartDay + 1;
+  const label = diwaliDayNumber >= 1 && diwaliDayNumber <= 5
+    ? `Day ${diwaliDayNumber} of Diwali`
+    : `${festivalStartDay - diya.id} days to Diwali`;
+  const cardVideo = experience.cardVideo;
+  const easterEgg = experience.easterEgg;
+  const hasInteractiveBack = Boolean(cardVideo?.src || easterEgg);
 
   dimOverlayEl = document.createElement("div");
   dimOverlayEl.className = "dim-overlay";
@@ -942,12 +1279,13 @@ function showInfoCard(diya, experience) {
 
   revealCardEl = document.createElement("div");
   revealCardEl.className = "reveal-card info-card";
+  if (hasInteractiveBack) revealCardEl.classList.add("video-treasure-card");
   if (imageSrc) revealCardEl.classList.add("has-image", "image-loading");
   else revealCardEl.classList.add("has-placeholder");
   revealCardEl.setAttribute("role", "dialog");
   revealCardEl.setAttribute("aria-modal", "true");
   revealCardEl.setAttribute("aria-label", experience.title || diya.theme);
-  revealCardEl.innerHTML = `
+  const frontFace = `
     <div class="card-header">
       <button class="reveal-card-close" aria-label="Close">×</button>
       ${imageSrc ? '<div class="card-image-photo" role="img" aria-label="' + (experience.title || diya.theme) + '"></div><div class="card-image-scrim"></div>' : '<div class="info-card-placeholder">✦</div>'}
@@ -957,11 +1295,63 @@ function showInfoCard(diya, experience) {
         <div class="card-divider"></div>
       </div>
     </div>
-    <div class="card-body-wrap"><div class="card-body"><p class="story-copy">${description}</p></div></div>
+    <div class="card-body-wrap"><div class="card-body"><p class="story-copy">${description}</p>${hasInteractiveBack ? `<button class="card-video-treasure" type="button" aria-label="${easterEgg?.label || cardVideo?.label || "Play hidden video"}"><span aria-hidden="true">${easterEgg?.icon || "🎁"}</span></button>` : ""}</div></div>
   `;
-  revealCardEl.querySelector(".reveal-card-close").addEventListener("click", teardownRevealCard);
+  const easterEggFace = () => easterEgg
+    ? `<div class="card-flip-face card-flip-back card-game-back">${getEasterEggMarkup(easterEgg)}</div>`
+    : "";
+  const backFace = cardVideo?.src ? `
+    <div class="card-flip-face card-flip-back">
+      <video class="card-flip-video" controls playsinline preload="metadata" aria-label="${experience.title || diya.theme} video"><source src="${cardVideo.src}" type="video/mp4"></video>
+    </div>
+  ` : easterEggFace();
+  revealCardEl.innerHTML = hasInteractiveBack
+    ? `<div class="card-flip-stage"><div class="card-flip-face card-flip-front">${frontFace}</div>${backFace}</div>`
+    : frontFace;
+  // Delegate closing so the control keeps working after a replay replaces
+  // the game face with fresh markup.
+  revealCardEl.addEventListener("click", (event) => {
+    if (event.target.closest(".reveal-card-close")) teardownRevealCard();
+  });
   container.appendChild(dimOverlayEl);
   dimOverlayEl.appendChild(revealCardEl);
+
+  const treasureButton = revealCardEl.querySelector(".card-video-treasure");
+  const flipVideo = revealCardEl.querySelector(".card-flip-video");
+  if (treasureButton && hasInteractiveBack) {
+    let isFlipping = false;
+    const resetEasterEgg = () => {
+      if (!easterEgg || !revealCardEl) return;
+      const completedGameFace = revealCardEl.querySelector(".card-game-back");
+      if (!completedGameFace) return;
+      completedGameFace.outerHTML = easterEggFace();
+      initFestivalEasterEgg(revealCardEl, easterEgg, turnToFront);
+    };
+    const turnToFront = () => {
+      if (isFlipping || !revealCardEl) return;
+      isFlipping = true;
+      flipVideo?.pause();
+      revealCardEl.classList.remove("is-video-flipped");
+      revealCardEl.addEventListener("transitionend", () => {
+        isFlipping = false;
+        resetEasterEgg();
+      }, { once: true });
+    };
+    treasureButton.addEventListener("click", () => {
+      if (isFlipping) return;
+      isFlipping = true;
+      revealCardEl.classList.add("is-video-flipped");
+      revealCardEl.addEventListener("transitionend", () => {
+        isFlipping = false;
+        if (flipVideo) {
+          flipVideo.currentTime = 0;
+          flipVideo.play().catch(() => {});
+        }
+      }, { once: true });
+    });
+    flipVideo?.addEventListener("ended", turnToFront);
+    if (easterEgg) initFestivalEasterEgg(revealCardEl, easterEgg, turnToFront);
+  }
 
   if (imageSrc) {
     const preload = new Image();

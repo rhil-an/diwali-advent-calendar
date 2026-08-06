@@ -157,7 +157,7 @@ def main():
     json_path = sys.argv[2] if len(sys.argv) > 2 else f"{ROOT}/assets/diwali_days.json"
     debug = "--debug" in sys.argv
 
-    bg = Image.open(f"{ROOT}/images/advent-background.jpg").convert("RGB").resize((WIDTH, HEIGHT))
+    bg = Image.open(f"{ROOT}/assets/images/backgrounds/advent-background.jpg").convert("RGB").resize((WIDTH, HEIGHT))
     mandala = {
         "outer": Image.open(f"{ROOT}/assets/mandala/mandala-outer.png").convert("RGBA"),
         "middle": Image.open(f"{ROOT}/assets/mandala/mandala-middle.png").convert("RGBA"),

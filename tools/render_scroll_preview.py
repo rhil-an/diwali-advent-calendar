@@ -200,7 +200,7 @@ def main():
     out_path = sys.argv[1] if len(sys.argv) > 1 else "tools/scroll_preview.png"
     json_path = "assets/diwali_days.json"
 
-    bg = Image.open("images/advent-background.jpg").convert("RGB").resize((WIDTH, HEIGHT))
+    bg = Image.open("assets/images/backgrounds/advent-background.jpg").convert("RGB").resize((WIDTH, HEIGHT))
 
     with open(json_path, encoding="utf-8") as f:
         cfg = json.load(f)

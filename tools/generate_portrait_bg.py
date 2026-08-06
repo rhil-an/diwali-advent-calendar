@@ -10,7 +10,7 @@ Design brief:
   - All key visual interest concentrated in the center column
     so cover-clipping the left/right edges on ultra-narrow phones is safe.
 
-Output: images/advent-background-portrait.jpg
+Output: assets/images/backgrounds/advent-background-portrait.jpg
 """
 
 import os

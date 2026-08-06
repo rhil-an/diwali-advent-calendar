@@ -12,7 +12,7 @@ window.DIWALI_DAYS_DATA = {
     "note": "A 21-day countdown to the five principal Diwali observances. Days 1-16 are preparation and reflection; Days 17-21 are Dhanteras, Naraka Chaturdashi (Choti Diwali), Lakshmi Puja (main Diwali), Govardhan Puja/Annakut, and Bhai Dooj. The main Diwali lamp (Day 19) sits at the mandala centre. Names and customs vary by region and community.",
     "payloadTypes": "text | assets/image.png | mp4:assets/video.mp4",
     "storyCard": "Every lamp opens one mobile-first story card. Optional diya.story is the short episode narration; description remains the expandable cultural note. Video files stay lazy-loaded from the mp4 payload path.",
-    "background": "images/diwali-background.png (664x997)"
+    "background": "assets/images/backgrounds/diwali-background.png (664x997)"
   },
   "lampScale": 0.9,
   "festivalStartDay": 17,
@@ -147,9 +147,9 @@ window.DIWALI_DAYS_DATA = {
       "ring": 1,
       "theme": "Rangoli",
       "emoji": "🎨",
-      "description": "Rangoli are beautiful geometric patterns drawn at home entrances using coloured powders, flower petals, and rice. They welcome Lakshmi, the goddess of prosperity, into the home.",
+      "description": "Rangoli are decorative patterns drawn at home entrances using coloured powders, flower petals, and rice. In many households, they form part of a welcome for Lakshmi, the goddess of prosperity.",
       "payload": "text",
-      "cardImage": "images/rangoli-doorstep.png",
+      "cardImage": "assets/images/cards/rangoli-doorstep.png",
       "pos": {
         "x": 0.2097,
         "y": 0.1538,
@@ -162,9 +162,9 @@ window.DIWALI_DAYS_DATA = {
       "ring": 1,
       "theme": "Cleaning the Home",
       "emoji": "🏠",
-      "description": "Two weeks before Diwali, families deep-clean every corner of the home. A spotless house invites Goddess Lakshmi — she is said to visit only homes that are pure and welcoming.",
+      "description": "In the weeks before Diwali, many families deep-clean and decorate their homes. In many traditions, this creates a welcoming setting for Lakshmi, the goddess of prosperity.",
       "payload": "text",
-      "cardImage": "images/cleaning-home-diwali.png",
+      "cardImage": "assets/images/cards/cleaning-home-diwali.png",
       "pos": {
         "x": 0.4363,
         "y": 0.1597,
@@ -193,7 +193,7 @@ window.DIWALI_DAYS_DATA = {
       "emoji": "🍬",
       "description": "Mithai — traditional Indian sweets — are central to Diwali. Kaju Katli (cashew fudge), Gulab Jamun, Ladoo, and Barfi are gifted between families to share in the joy of the festival.",
       "payload": "text",
-      "cardImage": "images/festival-sweets-mithai.png",
+      "cardImage": "assets/images/cards/festival-sweets-mithai.png",
       "pos": {
         "x": 0.7708,
         "y": 0.3116,
@@ -208,7 +208,7 @@ window.DIWALI_DAYS_DATA = {
       "emoji": "👗",
       "description": "Diwali is a time to wear new clothes. Women wear vibrant sarees and lehengas in jewel tones — deep reds, royal blues, and golds — while men don kurta-pajamas or sherwanis.",
       "payload": "text",
-      "cardImage": "images/traditional-dress-diwali.png",
+      "cardImage": "assets/images/cards/traditional-dress-diwali.png",
       "pos": {
         "x": 0.4524,
         "y": 0.3099,
@@ -235,9 +235,9 @@ window.DIWALI_DAYS_DATA = {
       "ring": 1,
       "theme": "Fireworks",
       "emoji": "🎆",
-      "description": "Firecrackers have been part of Diwali for centuries — their lights and sounds are believed to ward off evil spirits. Today, many celebrate with sparklers and low-smoke alternatives.",
+      "description": "Some Diwali celebrations include fireworks or sparklers, while others choose quieter, lower-smoke ways to enjoy the lights. Local rules and household preferences vary.",
       "payload": "mp4:assets/videos/bonus/sparkler-play.mp4",
-      "cardImage": "images/diwali-fireworks-sky.png",
+      "cardImage": "assets/images/cards/diwali-fireworks-sky.png",
       "pos": {
         "x": 0.1423,
         "y": 0.471,
@@ -250,9 +250,9 @@ window.DIWALI_DAYS_DATA = {
       "ring": 1,
       "theme": "Marigold Garlands",
       "emoji": "🌼",
-      "description": "Marigolds — called Genda Phool — are the flower of Diwali. Their vibrant orange and yellow hues symbolise auspiciousness and the sun. Garlands adorn doorways, idols, and offering plates.",
+      "description": "Marigolds — called Genda Phool — are widely used in Diwali decorations. Their vibrant orange and yellow hues are associated with auspiciousness, and garlands may adorn doorways, idols, and offering plates.",
       "payload": "text",
-      "cardImage": "images/marigold-garland-doorway.png",
+      "cardImage": "assets/images/cards/marigold-garland-doorway.png",
       "pos": {
         "x": 0.4775,
         "y": 0.4813,
@@ -265,9 +265,9 @@ window.DIWALI_DAYS_DATA = {
       "ring": 2,
       "theme": "Music & Dance",
       "emoji": "🥁",
-      "description": "The dhol drum and tabla drive the rhythms of Diwali celebrations. Classical Bharatanatyam and folk Garba and Dandiya dances fill community gatherings with energy and colour.",
+      "description": "Music and dance bring energy to many community celebrations. The traditions vary widely by region: dhol and tabla may feature, while forms such as Garba and Dandiya are especially associated with western India and the Navratri season.",
       "payload": "text",
-      "cardImage": "images/music-and-dance.png",
+      "cardImage": "assets/images/cards/music-and-dance.png",
       "pos": {
         "x": 0.6969,
         "y": 0.4827,
@@ -280,9 +280,9 @@ window.DIWALI_DAYS_DATA = {
       "ring": 2,
       "theme": "Diwali Around the World",
       "emoji": "🌍",
-      "description": "Diwali is celebrated by over a billion people globally — in India, UK, USA, Canada, Singapore, Fiji, South Africa, and beyond. It is a public holiday in over a dozen countries.",
+      "description": "Diwali is celebrated by millions of people around the world, including communities in India, the United Kingdom, the United States, Canada, Singapore, Fiji, South Africa, and beyond. It is a national public holiday in several countries, while recognition elsewhere may be regional or local.",
       "payload": "text",
-      "cardImage": "images/diwali-around-the-world.png",
+      "cardImage": "assets/images/cards/diwali-around-the-world.png",
       "pos": {
         "x": 0.7617,
         "y": 0.6212,
@@ -407,7 +407,7 @@ window.DIWALI_DAYS_DATA = {
       "emoji": "🌙",
       "description": "The second day, also called Choti Diwali in many North Indian traditions. In several regions it recalls Krishna's victory over Narakasura; oil baths, cleansing rituals, and diyas are common, with customs varying across communities.",
       "payload": "text",
-      "cardImage": "images/choti-diwali-day2.png",
+      "cardImage": "assets/images/cards/choti-diwali-day2.png",
       "pos": {
         "x": 0.1808,
         "y": 0.6317,
@@ -448,7 +448,7 @@ window.DIWALI_DAYS_DATA = {
       "emoji": "🙏",
       "description": "Often observed as Govardhan Puja or Annakut, recalling Krishna sheltering villagers beneath Govardhan Hill and giving thanks for nature's abundance. In some regions this date is instead marked as Bali Pratipada or Padwa.",
       "payload": "text",
-      "cardImage": "images/govardhan-puja-day4.png",
+      "cardImage": "assets/images/cards/govardhan-puja-day4.png",
       "pos": {
         "x": 0.4202,
         "y": 0.7859,
