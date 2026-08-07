@@ -32,13 +32,6 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* Local visual trial only. Samarkan is shareware; see assets/fonts/samarkan/README.TXT. */
-@font-face {
-  font-family: "Samarkan Trial";
-  src: url("assets/fonts/samarkan/SAMAN___.TTF") format("truetype");
-  font-display: swap;
-}
-
 /* Warm gold text-selection to match the festival palette instead of the
    default blue system highlight. */
 ::selection {

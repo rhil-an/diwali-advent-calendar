@@ -16,7 +16,6 @@ class ScrollBanner {
     this.text       = cfg.text        || "Countdown to Diwali";
     this.textColor  = cfg.textColor   || "#7a1204";
     this.textShadow = cfg.textShadow  || "#ffe6b8";
-    this.fontFamily = cfg.fontFamily  || "Cinzel, Georgia, serif";
     this.image      = bannerImg;
 
     // Layout — normalized (0-1) fractions of the canvas, so the banner
@@ -105,13 +104,13 @@ class ScrollBanner {
     const boxCy = cy + (((this.safeArea.y0 + this.safeArea.y1) / 2) - 0.5) * bannerH;
 
     push();
-    textFont(this.fontFamily);
+    textFont("Cinzel, Georgia, serif");
     textStyle(BOLD);
     textAlign(CENTER, CENTER);
 
     // Cache key encodes every input that affects the fit result.
     // Rounded to integers so sub-pixel jitter never busts the cache.
-    const cacheKey = `${Math.round(bannerW)}|${Math.round(bannerH)}|${this.text}|${this.fontFamily}|${this.fontSizePx}|${this.minFontSizePx}`;
+    const cacheKey = `${Math.round(bannerW)}|${Math.round(bannerH)}|${this.text}|${this.fontSizePx}|${this.minFontSizePx}`;
     let lines, fontPx;
 
     if (this._textCache && this._textCacheKey === cacheKey) {

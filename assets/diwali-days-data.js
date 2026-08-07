@@ -139,8 +139,7 @@ window.DIWALI_DAYS_DATA = {
     "enabled": true,
     "text": "21-Day Countdown to Diwali",
     "textColor": "#7a1204",
-    "textShadow": "#ffe6b8",
-    "fontFamily": "Samarkan Trial, Cinzel, Georgia, serif"
+    "textShadow": "#ffe6b8"
   },
   "diyas": [
     {

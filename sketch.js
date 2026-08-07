@@ -232,17 +232,6 @@ function finishSetup() {
   initVideoPlayer();
   initMoonPhase();
   initProgressBadge();
-
-  // The banner may render once before the local trial font finishes loading.
-  // Clear its measurements when ready so its auto-fit pass uses Samarkan.
-  if (document.fonts) {
-    document.fonts.load("16px 'Samarkan Trial'").then(() => {
-      if (scrollBanner) {
-        scrollBanner._textCache = null;
-        scrollBanner._textCacheKey = null;
-      }
-    }).catch(() => { /* Cinzel fallback remains available. */ });
-  }
 }
 
 /* -----------------------------------------------------------
