@@ -135,6 +135,7 @@ let totalDays          = 15;
 let festivalStartDay   = 11;
 let mainDiwaliDay      = 13;
 let progressBadgeEl   = null;
+let creditsLinkEl     = null;
 
 // Illumination % per calendar day (from lunar-cycle CSV mapping)
 const MOON_ILLUMINATION = {
@@ -231,6 +232,17 @@ function finishSetup() {
   initVideoPlayer();
   initMoonPhase();
   initProgressBadge();
+
+  // The banner may render once before the local trial font finishes loading.
+  // Clear its measurements when ready so its auto-fit pass uses Samarkan.
+  if (document.fonts) {
+    document.fonts.load("16px 'Samarkan Trial'").then(() => {
+      if (scrollBanner) {
+        scrollBanner._textCache = null;
+        scrollBanner._textCacheKey = null;
+      }
+    }).catch(() => { /* Cinzel fallback remains available. */ });
+  }
 }
 
 /* -----------------------------------------------------------
@@ -339,6 +351,7 @@ function resizeToViewport() {
   rebuildEmbers();
   syncMoonPosition();
   syncProgressBadgePosition();
+  syncCreditsLinkPosition();
 }
 
 /* -----------------------------------------------------------
@@ -450,6 +463,24 @@ function syncProgressBadgePosition() {
 
   progressBadgeEl.style.right = `${pr.right - cr.right + cr.width * rightFrac}px`;
   progressBadgeEl.style.top   = `${cr.top - pr.top + cr.height * topFrac}px`;
+}
+
+/* Keeps the contributors icon inside the lower-right edge of the calendar
+   artwork, even when the canvas is letterboxed within a wider viewport. */
+function syncCreditsLinkPosition() {
+  if (!creditsLinkEl) creditsLinkEl = document.getElementById("credits-link");
+  if (!creditsLinkEl || !canvasEl || !canvasEl.elt) return;
+
+  const canvas = canvasEl.elt;
+  const parent = canvas.parentElement;
+  if (!parent) return;
+
+  const cr = canvas.getBoundingClientRect();
+  const pr = parent.getBoundingClientRect();
+  const inset = Math.max(10, Math.round(cr.width * 0.025));
+
+  creditsLinkEl.style.right = `${pr.right - cr.right + inset}px`;
+  creditsLinkEl.style.bottom = `${pr.bottom - cr.bottom + inset}px`;
 }
 
 /* -----------------------------------------------------------

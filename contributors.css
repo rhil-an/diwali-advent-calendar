@@ -1,0 +1,133 @@
+/*
+  CONTRIBUTORS PAGE TYPOGRAPHY
+  These variables affect contributors.html only. Adjust them freely without
+  changing the calendar's own style.css.
+*/
+/* Local visual trial only. Samarkan is shareware; see assets/fonts/samarkan/README.TXT. */
+@font-face {
+  font-family: "Samarkan Trial";
+  src: url("assets/fonts/samarkan/SAMAN___.TTF") format("truetype");
+  font-display: swap;
+}
+
+:root {
+  --page-font: "Poppins", sans-serif;
+  --heading-font: "Samarkan Trial", "Cinzel", serif;
+  --heading-weight: 700;
+  --heading-size: clamp(2rem, 7vw, 4.25rem);
+  --name-weight: 600;
+  --name-size: clamp(1.1rem, 2.8vw, 1.5rem);
+  --role-size: 0.95rem;
+  --body-size: 1rem;
+  --ink: #fff3d6;
+  --gold: #ffd36b;
+  --muted: #e8cfa2;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--page-font);
+  font-size: var(--body-size);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(163, 78, 12, 0.38), transparent 38rem),
+    radial-gradient(circle at 10% 90%, rgba(109, 33, 6, 0.36), transparent 34rem),
+    #100d2b;
+}
+
+.contributors-page {
+  width: min(100%, 68rem);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: max(1.5rem, env(safe-area-inset-top)) max(1.25rem, env(safe-area-inset-right)) max(2rem, env(safe-area-inset-bottom)) max(1.25rem, env(safe-area-inset-left));
+}
+
+.back-link {
+  display: inline-block;
+  margin-bottom: clamp(2rem, 7vh, 5rem);
+  color: var(--gold);
+  font-family: var(--heading-font);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+}
+
+.back-link:hover { color: #fff3d6; }
+.back-link:focus-visible { outline: 2px solid #fff3d6; outline-offset: 4px; }
+
+.contributors-card {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: clamp(1.75rem, 7vw, 4.5rem);
+  border: 1px solid rgba(255, 211, 107, 0.42);
+  border-radius: 1.5rem;
+  background: rgba(30, 12, 28, 0.72);
+  box-shadow: 0 1.5rem 4rem rgba(0, 0, 0, 0.35), inset 0 0 5rem rgba(190, 87, 5, 0.08);
+  text-align: center;
+}
+
+.eyebrow {
+  margin: 0 0 1rem;
+  color: var(--gold);
+  font-family: var(--heading-font);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 0;
+  color: #fff6dc;
+  font-family: var(--heading-font);
+  font-size: var(--heading-size);
+  font-weight: var(--heading-weight);
+  line-height: 1.15;
+}
+
+.intro {
+  max-width: 36rem;
+  margin: 1.5rem auto 0;
+  color: var(--muted);
+  font-weight: 300;
+  line-height: 1.8;
+}
+
+.contributors-list {
+  margin: clamp(2rem, 6vw, 3.5rem) 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid rgba(255, 211, 107, 0.25);
+}
+
+.contributor {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1.25rem 0;
+  border-bottom: 1px solid rgba(255, 211, 107, 0.25);
+}
+
+.contributor-name {
+  color: #fff6dc;
+  font-size: var(--name-size);
+  font-weight: var(--name-weight);
+}
+
+.contributor-role {
+  color: var(--gold);
+  font-size: var(--role-size);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+}
+
+.thanks {
+  margin: clamp(2rem, 6vw, 3.5rem) 0 0;
+  color: var(--muted);
+  font-family: var(--heading-font);
+  font-size: 1rem;
+  font-style: italic;
+}
