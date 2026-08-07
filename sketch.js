@@ -135,6 +135,7 @@ let totalDays          = 15;
 let festivalStartDay   = 11;
 let mainDiwaliDay      = 13;
 let progressBadgeEl   = null;
+let creditsLinkEl     = null;
 
 // Illumination % per calendar day (from lunar-cycle CSV mapping)
 const MOON_ILLUMINATION = {
@@ -339,6 +340,7 @@ function resizeToViewport() {
   rebuildEmbers();
   syncMoonPosition();
   syncProgressBadgePosition();
+  syncCreditsLinkPosition();
 }
 
 /* -----------------------------------------------------------
@@ -450,6 +452,24 @@ function syncProgressBadgePosition() {
 
   progressBadgeEl.style.right = `${pr.right - cr.right + cr.width * rightFrac}px`;
   progressBadgeEl.style.top   = `${cr.top - pr.top + cr.height * topFrac}px`;
+}
+
+/* Keeps the contributors icon inside the lower-right edge of the calendar
+   artwork, even when the canvas is letterboxed within a wider viewport. */
+function syncCreditsLinkPosition() {
+  if (!creditsLinkEl) creditsLinkEl = document.getElementById("credits-link");
+  if (!creditsLinkEl || !canvasEl || !canvasEl.elt) return;
+
+  const canvas = canvasEl.elt;
+  const parent = canvas.parentElement;
+  if (!parent) return;
+
+  const cr = canvas.getBoundingClientRect();
+  const pr = parent.getBoundingClientRect();
+  const inset = Math.max(10, Math.round(cr.width * 0.025));
+
+  creditsLinkEl.style.right = `${pr.right - cr.right + inset}px`;
+  creditsLinkEl.style.bottom = `${pr.bottom - cr.bottom + inset}px`;
 }
 
 /* -----------------------------------------------------------
